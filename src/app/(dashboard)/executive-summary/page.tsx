@@ -1,4 +1,4 @@
-import { DashboardShell } from "@/components/layout/dashboard-shell";
+import DashboardShell from "@/components/layout/dashboard-shell";
 import { buildExecutiveSummaryModel } from "@/lib/reporting/metrics/executive-summary";
 import { getReportingDataset } from "@/lib/reporting/services/reporting-source";
 
