@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# Local finance source files
+data/input/*.xlsx
+data/input/*.xls
+data/input/*.csv
+!data/input/.gitkeep
