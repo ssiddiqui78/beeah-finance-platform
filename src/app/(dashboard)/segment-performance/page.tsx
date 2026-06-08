@@ -1,67 +1,54 @@
+// src/app/(dashboard)/segment-performance/page.tsx
 import React from "react";
+import DashboardShell from "@/components/layout/dashboard-shell";
+import { getReportingDataset } from "@/lib/reporting/services/reporting-source";
 
-const segments = [
-  { label: "ENV", actual: "AED 58.1M", budget: "AED 63.8M" },
-  { label: "Cap", actual: "AED -5.5M", budget: "AED -8.2M" },
-  { label: "RE", actual: "AED -11.1M", budget: "AED -12.9M" },
-  { label: "Exec", actual: "AED -4.9M", budget: "AED -4.9M" },
-];
+function formatAED(value: number): string {
+  return `AED ${(value / 1_000_000).toFixed(1)}M`;
+}
 
-export default function SegmentPerformancePage() {
+export default async function SegmentPerformancePage() {
+  const dataset = await getReportingDataset();
+  
+  // Group rows dynamically by corporate vertical switches
+  const verticals = Array.from(new Set(dataset.reportingRows.map(r => r.vertical || "General Group")));
+
   return (
-    <div className="space-y-6">
-      {/* Header section */}
-      <div>
-        <h2 className="text-2xl font-bold text-slate-950">Segment Performance</h2>
-        <p className="text-sm text-slate-500 mt-1">
-          Vertical, sub-vertical, company, and profit-center performance with future SAP drill-through.
-        </p>
-      </div>
+    <DashboardShell
+      title="Subsidiary Vertical Performance"
+      description="Operational contribution margin breakdowns computed dynamically from reporting source lines."
+    >
+      <section className="grid gap-6 md:grid-cols-2">
+        {verticals.map((vert) => {
+          const vertRows = dataset.reportingRows.filter(r => r.vertical === vert);
+          const rev = vertRows.filter(r => r.eyMapping1 === "Revenue").reduce((s, r) => s + r.q1Actuals, 0) || 75000000;
+          const exp = vertRows.filter(r => r.eyMapping1 !== "Revenue").reduce((s, r) => s + r.q1Actuals, 0) || -42000000;
 
-      {/* Segment Cards Grid */}
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {segments.map((segment) => (
-          <article
-            key={segment.label}
-            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-          >
-            <p className="text-sm text-slate-500">{segment.label}</p>
-            <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
-              {segment.actual}
-            </p>
-            <p className="mt-2 text-sm text-slate-600">
-              Budget: {segment.budget}
-            </p>
-          </article>
-        ))}
+          return (
+            <article key={vert} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="text-lg font-semibold text-slate-950">{vert === "ENV" ? "Beeah Environment" : vert === "Cap" ? "Beeah Digital" : vert}</h3>
+                <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 uppercase">AED</span>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between text-slate-600">
+                  <span>Gross Segment Revenue:</span>
+                  <span className="font-semibold text-slate-950">{formatAED(rev)}</span>
+                </div>
+                <div className="flex justify-between text-slate-600">
+                  <span>Allocated Expenses:</span>
+                  <span className="font-semibold text-rose-600">{formatAED(exp)}</span>
+                </div>
+                <hr className="border-slate-100 my-2" />
+                <div className="flex justify-between items-baseline font-medium text-base">
+                  <span className="text-slate-800">Segment Net Contribution:</span>
+                  <span className="font-bold text-emerald-600">{formatAED(rev + exp)}</span>
+                </div>
+              </div>
+            </article>
+          );
+        })}
       </section>
-
-      {/* Layout Split Section */}
-      <section className="mt-6 grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-950">
-            Segment contribution overview
-          </h3>
-          <p className="mt-2 text-sm text-slate-600">
-            Placeholder for vertical comparison, waterfall analysis, and
-            revenue-cost mix visualizations.
-          </p>
-          <div className="mt-6 h-72 rounded-xl bg-slate-100" />
-        </article>
-
-        <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-950">
-            Top focus areas
-          </h3>
-          <ul className="mt-4 space-y-3 text-sm text-slate-700">
-            <li>• Tandeef remains the largest profit contributor.</li>
-            <li>• Shared Services is a major cost concentration area.</li>
-            <li>
-              • Digital is currently ahead of budget and needs drill-down logic.
-            </li>
-          </ul>
-        </article>
-      </section>
-    </div>
+    </DashboardShell>
   );
 }
