@@ -1,0 +1,3 @@
+# Local finance cache
+data/cache/*.json
+!data/cache/.gitkeep

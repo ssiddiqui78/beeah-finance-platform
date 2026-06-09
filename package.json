@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "validate:workbook": "ts-node -r tsconfig-paths/register scripts/validate-workbook.ts"
+    "validate:workbook": "ts-node -O \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/validate-workbook.ts",
+    "import:workbook": "ts-node -O \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/import-workbook.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
