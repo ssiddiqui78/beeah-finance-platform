@@ -1,61 +1,142 @@
-"use client";
-
-import React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { LayoutDashboard, FileSpreadsheet, Scale, BarChart3 } from "lucide-react";
+import { ReactNode } from "react";
 
-const navigationItems = [
-  { name: "Executive Summary", href: "/executive-summary", icon: LayoutDashboard },
-  { name: "Consolidated P&L", href: "/consolidated-pnl", icon: FileSpreadsheet },
-  { name: "Balance Sheet", href: "/balance-sheet", icon: Scale },
-  { name: "Segment Performance", href: "/segment-performance", icon: BarChart3 },
-];
+import { primaryNavigation } from "@/lib/config/navigation";
+import { getReportingStatus } from "@/lib/reporting/services/reporting-status";
 
-export default function DashboardShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+type DashboardShellProps = {
+  children: ReactNode;
+  title: string;
+  description: string;
+};
+
+function formatImportTime(value: string | null): string | null {
+  if (!value) return null;
+
+  return new Date(value).toLocaleString("en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+export async function DashboardShell({
+  children,
+  title,
+  description,
+}: DashboardShellProps) {
+  const reportingStatus = await getReportingStatus();
+  const importTimeLabel = formatImportTime(reportingStatus.lastImportedAt);
 
   return (
-    <div className="flex h-screen w-screen bg-slate-50 overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-64 bg-slate-900 text-white flex flex-col h-full border-r border-slate-800">
-        <div className="h-16 flex items-center px-6 border-b border-slate-800">
-          <span className="text-xl font-bold tracking-tight text-emerald-400">Beeah Finance</span>
-        </div>
-        
-        <nav className="flex-1 py-4 space-y-1 px-3 overflow-y-auto">
-          {navigationItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = pathname === item.href;
-            
-            return (
+    <div className="min-h-screen bg-slate-50 text-slate-950">
+      <div className="grid min-h-screen lg:grid-cols-[260px_1fr]">
+        <aside className="border-r border-slate-200 bg-[#0f172a] text-slate-100">
+          <div className="border-b border-white/10 px-6 py-6">
+            <p className="text-xs uppercase tracking-[0.24em] text-slate-400">
+              Beeah
+            </p>
+            <h1 className="mt-2 text-xl font-semibold">Finance Platform</h1>
+            <p className="mt-2 text-sm text-slate-300">
+              Reporting, planning, and AI-ready financial analysis.
+            </p>
+          </div>
+
+          <nav className="flex flex-col gap-2 p-4">
+            {primaryNavigation.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 ${
-                  isActive 
-                    ? "bg-emerald-600 text-white" 
-                    : "text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-                }`}
+                className="rounded-xl border border-transparent px-4 py-3 transition hover:border-white/10 hover:bg-white/5"
               >
-                <Icon className="h-5 w-5 shrink-0" />
-                <span>{item.name}</span>
+                <div className="text-sm font-medium text-white">
+                  {item.label}
+                </div>
+                <div className="mt-1 text-xs leading-5 text-slate-400">
+                  {item.description}
+                </div>
               </Link>
-            );
-          })}
-        </nav>
-      </aside>
+            ))}
+          </nav>
 
-      {/* Main Content Viewport */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden">
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0">
-          <h1 className="text-lg font-semibold text-slate-800">Financial Platform</h1>
-          <div className="text-sm text-slate-500">System Live</div>
-        </header>
-        <div className="flex-1 overflow-auto p-8">
-          {children}
+          <div className="mx-4 mt-2 rounded-2xl border border-white/10 bg-white/5 p-4">
+            <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+              Reporting status
+            </p>
+            <p className="mt-3 text-sm font-medium text-white">
+              {reportingStatus.label}
+            </p>
+            <p className="mt-1 text-xs text-slate-300">
+              Period: {reportingStatus.periodLabel}
+            </p>
+            <p className="mt-1 text-xs text-slate-300">
+              Source: {reportingStatus.sourceType}
+            </p>
+            {reportingStatus.reportingRowCount !== null ? (
+              <p className="mt-1 text-xs text-slate-300">
+                Rows: {reportingStatus.reportingRowCount.toLocaleString()}
+              </p>
+            ) : null}
+            {reportingStatus.summaryControlCount !== null ? (
+              <p className="mt-1 text-xs text-slate-300">
+                Controls: {reportingStatus.summaryControlCount.toLocaleString()}
+              </p>
+            ) : null}
+            {importTimeLabel ? (
+              <p className="mt-2 text-xs text-slate-400">
+                Imported: {importTimeLabel}
+              </p>
+            ) : null}
+          </div>
+        </aside>
+
+        <div className="flex min-h-screen flex-col">
+          <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
+            <div className="flex flex-col gap-4 px-6 py-4 lg:px-10">
+              <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-[0.24em] text-slate-500">
+                    Monthly reporting cockpit
+                  </p>
+                  <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">
+                    {title}
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-600">{description}</p>
+                </div>
+
+                <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-600">
+                  {reportingStatus.periodLabel} • AED millions
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <div className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700">
+                  Mode: {reportingStatus.label}
+                </div>
+                <div className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700">
+                  Source: {reportingStatus.sourceType}
+                </div>
+                {reportingStatus.reportingRowCount !== null ? (
+                  <div className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700">
+                    {reportingStatus.reportingRowCount.toLocaleString()} rows
+                  </div>
+                ) : null}
+                {reportingStatus.summaryControlCount !== null ? (
+                  <div className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700">
+                    {reportingStatus.summaryControlCount.toLocaleString()} controls
+                  </div>
+                ) : null}
+                {importTimeLabel ? (
+                  <div className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700">
+                    Imported {importTimeLabel}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </header>
+
+          <main className="flex-1 px-6 py-6 lg:px-10 lg:py-8">{children}</main>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
