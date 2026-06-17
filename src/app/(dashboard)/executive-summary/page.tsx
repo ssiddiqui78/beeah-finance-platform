@@ -1,6 +1,8 @@
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { buildExecutiveSummaryModel } from "@/lib/reporting/metrics/executive-summary";
 import { getReportingDataset } from "@/lib/reporting/services/reporting-source";
+// 1. Import your brand new URL-backed filter bar component
+import { ReportingFilterBar } from "@/components/filters/reporting-filter-bar";
 
 function formatAedMillions(value: number): string {
   return `AED ${value.toFixed(1)}M`;
@@ -64,6 +66,11 @@ export default async function ExecutiveSummaryPage() {
       title="Executive Summary"
       description={`Management KPI overview and variance summary for ${model.periodLabel}.`}
     >
+      {/* 2. Inject the ReportingFilterBar component right above the grid section cards */}
+      <div className="mb-6">
+        <ReportingFilterBar />
+      </div>
+
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {cards.map((card) => (
           <article
