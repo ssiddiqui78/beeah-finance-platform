@@ -1,26 +1,67 @@
-import { ReportingContext, ReportingScenario, ReportingView } from "@/types/reporting-context";
+import type { ReportingContext, ReportingScenario, ReportingView } from "@/types/reporting-context";
 
-export function parseReportingContext(searchParams: Record<string, string | string[] | undefined>): ReportingContext {
-  const period = typeof searchParams.period === "string" ? searchParams.period : "latest";
-  
-  const rawScenario = typeof searchParams.scenario === "string" ? searchParams.scenario : "actual_vs_budget";
-  const scenario: ReportingScenario = ["actual_vs_budget", "actual", "budget", "forecast"].includes(rawScenario)
-    ? (rawScenario as ReportingScenario)
-    : "actual_vs_budget";
+type SearchParamValue = string | string[] | undefined;
 
-  const vertical = typeof searchParams.vertical === "string" ? searchParams.vertical : "all";
-  const subVertical = typeof searchParams.subVertical === "string" ? searchParams.subVertical : "all";
+function pickSingleValue(value: SearchParamValue): string | undefined {
+  if (Array.isArray(value)) {
+    return value[0];
+  }
 
-  const rawView = typeof searchParams.view === "string" ? searchParams.view : "group";
-  const view: ReportingView = ["group", "segment", "company", "profit_center"].includes(rawView)
-    ? (rawView as ReportingView)
-    : "group";
+  return value;
+}
 
+function normalizeScenario(value: string | undefined): ReportingScenario {
+  if (
+    value === "actual_vs_budget" ||
+    value === "actual" ||
+    value === "budget" ||
+    value === "forecast"
+  ) {
+    return value;
+  }
+
+  return "actual_vs_budget";
+}
+
+function normalizeView(value: string | undefined): ReportingView {
+  if (
+    value === "group" ||
+    value === "segment" ||
+    value === "company" ||
+    value === "profit_center"
+  ) {
+    return value;
+  }
+
+  return "group";
+}
+
+export function parseReportingContext(
+  searchParams: Record<string, SearchParamValue>
+): ReportingContext {
   return {
-    period,
-    scenario,
-    vertical,
-    subVertical,
-    view,
+    period: pickSingleValue(searchParams.period) ?? "latest",
+    scenario: normalizeScenario(pickSingleValue(searchParams.scenario)),
+    vertical: pickSingleValue(searchParams.vertical) ?? "all",
+    subVertical: pickSingleValue(searchParams.subVertical) ?? "all",
+    view: normalizeView(pickSingleValue(searchParams.view)),
   };
+}
+
+export function buildScopeLabel(context: ReportingContext): string {
+  const parts: string[] = [];
+
+  if (context.vertical !== "all") {
+    parts.push(context.vertical);
+  }
+
+  if (context.subVertical !== "all") {
+    parts.push(context.subVertical);
+  }
+
+  if (parts.length === 0) {
+    return "Group-wide scope";
+  }
+
+  return parts.join(" • ");
 }

@@ -1,7 +1,7 @@
+import React, { Suspense } from "react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { buildExecutiveSummaryModel } from "@/lib/reporting/metrics/executive-summary";
 import { getReportingDataset } from "@/lib/reporting/services/reporting-source";
-// 1. Import your brand new URL-backed filter bar component
 import { ReportingFilterBar } from "@/components/filters/reporting-filter-bar";
 
 function formatAedMillions(value: number): string {
@@ -28,9 +28,37 @@ function getToneClass(value: number): string {
   return "text-slate-600";
 }
 
-export default async function ExecutiveSummaryPage() {
-  const dataset = await getReportingDataset();
-  const model = buildExecutiveSummaryModel(dataset);
+interface PageProps {
+  searchParams: Promise<{ 
+    period?: string; 
+    scenario?: string; 
+    vertical?: string; 
+    subVertical?: string; 
+    view?: string; 
+  }>;
+}
+
+export default function ExecutiveSummaryPage({ searchParams }: PageProps) {
+  return (
+    <Suspense fallback={<div className="h-12 bg-white rounded-xl animate-pulse m-6" />}>
+      <ExecutiveSummaryContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function ExecutiveSummaryContent({ searchParams }: PageProps) {
+  const dataset = (await getReportingDataset()) as any;
+  const resolvedParams = await searchParams;
+  
+  const context = {
+    period: resolvedParams.period || "latest",
+    scenario: (resolvedParams.scenario as any) || "actual_vs_budget",
+    vertical: resolvedParams.vertical || "all",
+    subVertical: resolvedParams.subVertical || "all",
+    view: (resolvedParams.view as any) || "group",
+  };
+
+  const model = buildExecutiveSummaryModel(dataset, context);
 
   const cards = [
     {
@@ -66,69 +94,72 @@ export default async function ExecutiveSummaryPage() {
       title="Executive Summary"
       description={`Management KPI overview and variance summary for ${model.periodLabel}.`}
     >
-      {/* 2. Inject the ReportingFilterBar component right above the grid section cards */}
-      <div className="mb-6">
+      <div className="space-y-6">
         <ReportingFilterBar />
-      </div>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {cards.map((card) => (
-          <article
-            key={card.label}
-            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-          >
-            <p className="text-sm text-slate-500">{card.label}</p>
-            <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-              {card.value}
+        <div className="text-sm font-medium text-slate-500 bg-slate-100/60 border border-slate-200 px-4 py-2.5 rounded-xl inline-block">
+          Active Filter State: <span className="text-slate-900 font-semibold">{model.scenarioLabel}</span> ({model.filteredRowCount.toLocaleString()} Ledger Lines Mapped)
+        </div>
+
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {cards.map((card) => (
+            <article
+              key={card.label}
+              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+            >
+              <p className="text-sm text-slate-500">{card.label}</p>
+              <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+                {card.value}
+              </p>
+              <p className={`mt-2 text-sm font-medium ${card.tone}`}>{card.change}</p>
+            </article>
+          ))}
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+          <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 className="text-lg font-semibold text-slate-950">
+              Actual vs Budget Bridge Drivers
+            </h3>
+            <p className="mt-2 text-sm text-slate-600">
+              Data-driven bridge inputs from the semantic reporting layer.
             </p>
-            <p className={`mt-2 text-sm font-medium ${card.tone}`}>{card.change}</p>
-          </article>
-        ))}
-      </section>
 
-      <section className="mt-6 grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-950">
-            Actual vs Budget Bridge Drivers
-          </h3>
-          <p className="mt-2 text-sm text-slate-600">
-            Data-driven bridge inputs from the semantic reporting layer.
-          </p>
-
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {model.bridgeItems.map((item) => (
-              <div
-                key={item.label}
-                className="rounded-xl border border-slate-200 bg-slate-50 p-4"
-              >
-                <p className="text-sm font-medium text-slate-700">{item.label}</p>
-                <div className="mt-3 space-y-1 text-sm">
-                  <p className="text-slate-600">
-                    Actual: <span className="font-medium">{formatBridgeAedMillions(item.actual)}</span>
-                  </p>
-                  <p className="text-slate-600">
-                    Budget: <span className="font-medium">{formatBridgeAedMillions(item.budget)}</span>
-                  </p>
-                  <p className={`font-medium ${getToneClass(item.variance)}`}>
-                    Variance: {formatBridgeAedMillions(item.variance)}
-                  </p>
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {model.bridgeItems.map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                >
+                  <p className="text-sm font-medium text-slate-700 truncate">{item.label}</p>
+                  <div className="mt-3 space-y-1 text-sm">
+                    <p className="text-slate-600">
+                      Actual: <span className="font-medium">{formatBridgeAedMillions(item.actual)}</span>
+                    </p>
+                    <p className="text-slate-600">
+                      Budget: <span className="font-medium">{formatBridgeAedMillions(item.budget)}</span>
+                    </p>
+                    <p className={`font-medium ${getToneClass(item.variance)}`}>
+                      Variance: {formatBridgeAedMillions(item.variance)}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </article>
+              ))}
+            </div>
+          </article>
 
-        <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-950">
-            Management Attention
-          </h3>
-          <ul className="mt-4 space-y-3 text-sm text-slate-700">
-            {model.attentionItems.map((item) => (
-              <li key={item}>• {item}</li>
-            ))}
-          </ul>
-        </article>
-      </section>
+          <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 className="text-lg font-semibold text-slate-950">
+              Management Attention & Commentary
+            </h3>
+            <ul className="mt-4 space-y-3 text-sm text-slate-700">
+              {model.attentionItems.map((item) => (
+                <li key={item} className="leading-relaxed text-slate-600">• {item}</li>
+              ))}
+            </ul>
+          </article>
+        </section>
+      </div>
     </DashboardShell>
   );
 }
