@@ -1,5 +1,5 @@
 ﻿import React, { Suspense } from "react";
-import DashboardShell from "@/components/layout/dashboard-shell";
+import { DashboardShell } from "@/components/layout/dashboard-shell";
 import PeriodFilter from "@/components/shared/period-filter";
 import { getReportingDataset } from "@/lib/reporting/services/reporting-source";
 
