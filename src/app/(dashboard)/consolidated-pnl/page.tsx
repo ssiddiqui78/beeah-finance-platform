@@ -1,7 +1,7 @@
 ﻿import React, { Suspense } from "react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
-// 1. Import the unified URL-backed dashboard control panel
 import { ReportingFilterBar } from "@/components/filters/reporting-filter-bar";
+import { getReportingFilterOptions } from "@/lib/reporting/services/reporting-filter-options";
 import { getReportingDataset } from "@/lib/reporting/services/reporting-source";
 
 function formatCurrency(value: number): string {
@@ -35,20 +35,19 @@ async function PnLContent({ searchParams }: PageProps) {
   const dataset = await getReportingDataset();
   const plRows = dataset.reportingRows.filter(row => row.statementType === "PL");
   
-  // 2. Unpack all active URL filter strings from the Next.js page query state
   const resolvedParams = await searchParams;
-  const periodFocus = resolvedParams.period || "latest";
   const verticalFocus = resolvedParams.vertical || "all";
-  const scenarioFocus = resolvedParams.scenario || "actual_vs_budget";
+  const subVerticalFocus = resolvedParams.subVertical || "all";
   
   const activeCurrency = "AED";
 
-  // 3. Apply operational filter logic over the raw ledger rows based on the URL context
+  // Scan live dataset options on the server side
+  const filterOptions = await getReportingFilterOptions();
+
+  // Apply conditional data-aware filtering constraints over raw ledger rows
   const filteredRows = plRows.filter(row => {
-    // If a specific corporate vertical is chosen, isolate matching items
-    if (verticalFocus !== "all" && row.vertical !== verticalFocus) {
-      return false;
-    }
+    if (verticalFocus !== "all" && row.vertical !== verticalFocus) return false;
+    if (subVerticalFocus !== "all" && row.subVertical !== subVerticalFocus) return false;
     return true;
   });
 
@@ -58,8 +57,12 @@ async function PnLContent({ searchParams }: PageProps) {
       description={`Source-driven dynamic ledger view across operational sectors (${activeCurrency} in Millions).`}
     > 
       <div className="space-y-6">
-        {/* 4. Swap out the old legacy period filter with the global contextual filter panel */}
-        <ReportingFilterBar />
+        <ReportingFilterBar 
+          periodOptions={filterOptions.periodOptions}
+          verticalOptions={filterOptions.verticalOptions}
+          subVerticalOptions={filterOptions.subVerticalOptions}
+          subVerticalOptionsByVertical={filterOptions.subVerticalOptionsByVertical}
+        />
         
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           {filteredRows.length === 0 ? (
@@ -84,7 +87,6 @@ async function PnLContent({ searchParams }: PageProps) {
                     const name = row.glName || "";
                     const isTotal = name.toLowerCase().includes("total") || name.toLowerCase().includes("profit");
                     
-                    // Sum multi-period performance benchmarks dynamically
                     const dynamicTotal = 
                       (row.q1Actuals || 0) + 
                       (row.q2Budget || 0) + 

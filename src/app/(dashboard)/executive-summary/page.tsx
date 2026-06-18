@@ -3,7 +3,9 @@ import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { buildExecutiveSummaryModel } from "@/lib/reporting/metrics/executive-summary";
 import { parseReportingContext } from "@/lib/reporting/reporting-context";
 import { getReportingDataset } from "@/lib/reporting/services/reporting-source";
+// 1. Import your dynamic filter bar and option scanners
 import { ReportingFilterBar } from "@/components/filters/reporting-filter-bar";
+import { getReportingFilterOptions } from "@/lib/reporting/services/reporting-filter-options";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -130,6 +132,9 @@ async function ExecutiveSummaryContent({ searchParams }: PageProps) {
 
   const dataset = (await getReportingDataset()) as any;
   const model = buildExecutiveSummaryModel(dataset, context);
+  
+  // 2. Scan the current sheet dataset for active unique dropdown lists
+  const filterOptions = await getReportingFilterOptions();
 
   const revenueCard = getRevenueDisplay(
     context.scenario,
@@ -177,8 +182,13 @@ async function ExecutiveSummaryContent({ searchParams }: PageProps) {
       description={`Management KPI overview for ${model.periodLabel} • ${model.scopeLabel} • ${model.scenarioLabel}.`}
     >
       <div className="space-y-6">
-        {/* Render our interactive URL panel */}
-        <ReportingFilterBar />
+        {/* 3. Pass the database-aware options into the filter bar component */}
+        <ReportingFilterBar 
+          periodOptions={filterOptions.periodOptions}
+          verticalOptions={filterOptions.verticalOptions}
+          subVerticalOptions={filterOptions.subVerticalOptions}
+          subVerticalOptionsByVertical={filterOptions.subVerticalOptionsByVertical}
+        />
 
         <section className="mb-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

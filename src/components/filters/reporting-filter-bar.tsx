@@ -5,11 +5,9 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Filter } from "lucide-react";
 
 import {
-  periodOptions,
   reportingViewOptions,
   scenarioOptions,
-  subVerticalOptions,
-  verticalOptions,
+  type FilterOption,
 } from "@/lib/config/reporting-filters";
 
 type FilterKey =
@@ -19,14 +17,23 @@ type FilterKey =
   | "subVertical"
   | "view";
 
-function getSelectedLabel(
-  value: string,
-  options: { label: string; value: string }[]
-): string {
+type ReportingFilterBarProps = {
+  periodOptions: FilterOption[];
+  verticalOptions: FilterOption[];
+  subVerticalOptions: FilterOption[];
+  subVerticalOptionsByVertical: Record<string, FilterOption[]>;
+};
+
+function getSelectedLabel(value: string, options: FilterOption[]): string {
   return options.find((option) => option.value === value)?.label ?? value;
 }
 
-export function ReportingFilterBar() {
+export function ReportingFilterBar({
+  periodOptions,
+  verticalOptions,
+  subVerticalOptions,
+  subVerticalOptionsByVertical,
+}: ReportingFilterBarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -41,6 +48,20 @@ export function ReportingFilterBar() {
     }),
     [searchParams]
   );
+
+  const visibleSubVerticalOptions = useMemo(() => {
+    if (selectedValues.vertical === "all") {
+      return subVerticalOptions;
+    }
+
+    return (
+      subVerticalOptionsByVertical[selectedValues.vertical] ?? subVerticalOptions
+    );
+  }, [
+    selectedValues.vertical,
+    subVerticalOptions,
+    subVerticalOptionsByVertical,
+  ]);
 
   function updateFilter(key: FilterKey, value: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -57,7 +78,24 @@ export function ReportingFilterBar() {
       params.set(key, value);
     }
 
-    router.push(`${pathname}?${params.toString()}`);
+    if (key === "vertical") {
+      const nextSubVerticalOptions =
+        value === "all"
+          ? subVerticalOptions
+          : subVerticalOptionsByVertical[value] ?? subVerticalOptions;
+
+      const currentSubVertical = params.get("subVertical") ?? "all";
+      const isStillValid = nextSubVerticalOptions.some(
+        (option) => option.value === currentSubVertical
+      );
+
+      if (!isStillValid) {
+        params.delete("subVertical");
+      }
+    }
+
+    const query = params.toString();
+    router.push(query ? `${pathname}?${query}` : pathname);
   }
 
   return (
@@ -72,7 +110,7 @@ export function ReportingFilterBar() {
               Reporting Context
             </h3>
             <p className="text-xs text-slate-500">
-              URL-based filter state for future workbook, Supabase, and SAP-backed reporting.
+              Dataset-aware filter state for workbook, local snapshot, and future SAP-backed reporting.
             </p>
           </div>
         </div>
@@ -102,7 +140,7 @@ export function ReportingFilterBar() {
           <FilterSelect
             label="Sub-Vertical"
             value={selectedValues.subVertical}
-            options={subVerticalOptions}
+            options={visibleSubVerticalOptions}
             onChange={(value) => updateFilter("subVertical", value)}
           />
 
@@ -129,7 +167,10 @@ export function ReportingFilterBar() {
           />
           <ContextBadge
             label="Sub-Vertical"
-            value={getSelectedLabel(selectedValues.subVertical, subVerticalOptions)}
+            value={getSelectedLabel(
+              selectedValues.subVertical,
+              visibleSubVerticalOptions
+            )}
           />
           <ContextBadge
             label="View"
@@ -144,7 +185,7 @@ export function ReportingFilterBar() {
 type FilterSelectProps = {
   label: string;
   value: string;
-  options: { label: string; value: string }[];
+  options: FilterOption[];
   onChange: (value: string) => void;
 };
 
