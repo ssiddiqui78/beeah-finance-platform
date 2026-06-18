@@ -1,26 +1,35 @@
 ﻿import React, { Suspense } from "react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { ReportingFilterBar } from "@/components/filters/reporting-filter-bar";
-import { getReportingFilterOptions } from "@/lib/reporting/services/reporting-filter-options";
+import { parseReportingContext } from "@/lib/reporting/reporting-context";
 import { getReportingDataset } from "@/lib/reporting/services/reporting-source";
+import { getReportingFilterOptions } from "@/lib/reporting/services/reporting-filter-options";
+// Import the advanced playbook dynamic calculation model engine
+import { buildConsolidatedPnlModel } from "@/lib/reporting/metrics/consolidated-pnl";
 
-function formatCurrency(value: number): string {
-  if (value === 0) return "-";
-  const formatted = Math.abs(value).toLocaleString("en-US", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  });
-  return value < 0 ? `(${formatted})` : formatted;
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+function formatAedMillions(value: number): string {
+  return `AED ${value.toFixed(1)}M`;
+}
+
+function formatSignedAedMillions(value: number): string {
+  const sign = value >= 0 ? "+" : "-";
+  return `${sign}AED ${Math.abs(value).toFixed(1)}M`;
+}
+
+function formatPercent(value: number): string {
+  return `${value.toFixed(1)}%`;
+}
+
+function getToneClass(value: number): string {
+  if (value > 0) return "text-emerald-600";
+  if (value < 0) return "text-rose-600";
+  return "text-slate-600";
 }
 
 interface PageProps {
-  searchParams: Promise<{ 
-    period?: string; 
-    scenario?: string; 
-    vertical?: string; 
-    subVertical?: string; 
-    view?: string; 
-  }>;
+  searchParams: SearchParams;
 }
 
 export default function ConsolidatedPnLPage({ searchParams }: PageProps) {
@@ -32,90 +41,171 @@ export default function ConsolidatedPnLPage({ searchParams }: PageProps) {
 }
 
 async function PnLContent({ searchParams }: PageProps) {
-  const dataset = await getReportingDataset();
-  const plRows = dataset.reportingRows.filter(row => row.statementType === "PL");
-  
-  const resolvedParams = await searchParams;
-  const verticalFocus = resolvedParams.vertical || "all";
-  const subVerticalFocus = resolvedParams.subVertical || "all";
-  
-  const activeCurrency = "AED";
+  const resolvedSearchParams = await searchParams;
+  const context = parseReportingContext(resolvedSearchParams);
 
-  // Scan live dataset options on the server side
+  const dataset = (await getReportingDataset()) as any;
   const filterOptions = await getReportingFilterOptions();
+  
+  // Compute the dataset totals against context configurations
+  const model = buildConsolidatedPnlModel(dataset, context);
 
-  // Apply conditional data-aware filtering constraints over raw ledger rows
-  const filteredRows = plRows.filter(row => {
-    if (verticalFocus !== "all" && row.vertical !== verticalFocus) return false;
-    if (subVerticalFocus !== "all" && row.subVertical !== subVerticalFocus) return false;
-    return true;
-  });
+  const cards = [
+    {
+      label: "Revenue",
+      value: formatAedMillions(model.revenueActualM),
+      change: `${formatSignedAedMillions(
+        model.revenueActualM - model.revenueBudgetM
+      )} vs budget`,
+      tone: getToneClass(model.revenueActualM - model.revenueBudgetM),
+    },
+    {
+      label: "Gross Profit",
+      value: formatAedMillions(model.grossProfitActualM),
+      change: `${formatSignedAedMillions(
+        model.grossProfitActualM - model.grossProfitBudgetM
+      )} vs budget`,
+      tone: getToneClass(model.grossProfitActualM - model.grossProfitBudgetM),
+    },
+    {
+      label: "Gross Margin",
+      value: formatPercent(model.grossMarginPct),
+      change: "Calculated from actual revenue and direct cost",
+      tone: "text-slate-600",
+    },
+    {
+      label: "PBT",
+      value: formatAedMillions(model.pbtActualM),
+      change: `${formatSignedAedMillions(model.pbtVarianceM)} vs budget`,
+      tone: getToneClass(model.pbtVarianceM),
+    },
+  ];
 
   return (
     <DashboardShell
-      title="Consolidated Income Statement"
-      description={`Source-driven dynamic ledger view across operational sectors (${activeCurrency} in Millions).`}
-    > 
+      title="Consolidated P&L"
+      description={`Earnings engine for ${model.periodLabel} • ${model.scopeLabel} • ${model.scenarioLabel}.`}
+    >
       <div className="space-y-6">
+        {/* Render our data-aware contextual filter dropdown panel */}
         <ReportingFilterBar 
           periodOptions={filterOptions.periodOptions}
           verticalOptions={filterOptions.verticalOptions}
           subVerticalOptions={filterOptions.subVerticalOptions}
           subVerticalOptionsByVertical={filterOptions.subVerticalOptionsByVertical}
         />
-        
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          {filteredRows.length === 0 ? (
-            <div className="p-8 text-center text-sm text-slate-500">
-              No active P&L ledger metrics matched your selected reporting context filter fields.
+
+        {/* Scope Overview Badge Block Panel */}
+        <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
+                Active P&L scope
+              </p>
+              <h3 className="mt-2 text-xl font-semibold text-slate-950">
+                {model.scopeLabel}
+              </h3>
+              <p className="mt-1 text-sm text-slate-600">
+                {model.scenarioLabel}
+              </p>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-left text-sm">
-                <thead className="bg-slate-50 border-b border-slate-200 font-medium text-slate-600">
-                  <tr>
-                    <th className="p-4 pl-6 min-w-[280px]">Financial Line Item</th>
-                    <th className="p-4 text-right">Q1 Actuals</th>
-                    <th className="p-4 text-right">Q2 Budget</th>
-                    <th className="p-4 text-right">Q3 Budget</th>
-                    <th className="p-4 text-right">Q4 Budget</th>
-                    <th className="p-4 pr-6 text-right font-semibold text-slate-900">Period Total</th>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
+              {model.filteredRowCount.toLocaleString()} filtered reporting rows
+            </div>
+          </div>
+        </section>
+
+        {/* High Executive Metrics Summary Cards Grid */}
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {cards.map((card) => (
+            <article
+              key={card.label}
+              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+            >
+              <p className="text-sm text-slate-500">{card.label}</p>
+              <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+                {card.value}
+              </p>
+              <p className={`mt-2 text-sm font-medium ${card.tone}`}>{card.change}</p>
+            </article>
+          ))}
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+          {/* Main Statement Category Aggregations Data Grid */}
+          <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 className="text-lg font-semibold text-slate-950">
+              P&L Line Matrix
+            </h3>
+            <p className="mt-2 text-sm text-slate-600">
+              Scope-aware actual, budget, and variance view by reporting line item categories.
+            </p>
+
+            <div className="mt-6 overflow-x-auto">
+              <table className="min-w-full border-collapse text-sm text-left">
+                <thead>
+                  <tr className="border-b border-slate-200 text-slate-500">
+                    <th className="px-3 py-3 font-medium">Line Item Dimensions</th>
+                    <th className="px-3 py-3 font-medium text-right">Actual Balance</th>
+                    <th className="px-3 py-3 font-medium text-right">Budget Baseline</th>
+                    <th className="px-3 py-3 font-medium text-right">Variance Balance</th>
+                    <th className="px-3 py-3 font-medium text-right">Variance %</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {filteredRows.map((row, idx) => {
-                    const name = row.glName || "";
-                    const isTotal = name.toLowerCase().includes("total") || name.toLowerCase().includes("profit");
-                    
-                    const dynamicTotal = 
-                      (row.q1Actuals || 0) + 
-                      (row.q2Budget || 0) + 
-                      (row.q3Budget || 0) + 
-                      (row.q4Budget || 0);
-                      
-                    const compositeKey = `${row.glCode || "GL"}-${idx}-${name.substring(0,3)}`;
-                    
-                    return (
-                      <tr 
-                        key={compositeKey} 
-                        className={`hover:bg-slate-50/50 transition-colors ${isTotal ? "bg-slate-50/70 font-semibold text-slate-950" : ""}`}
-                      >
-                        <td className="p-4 pl-6 font-medium">{name}</td>
-                        <td className="p-4 text-right tabular-nums">{formatCurrency((row.q1Actuals || 0) / 1_000_000)}</td>
-                        <td className="p-4 text-right tabular-nums">{formatCurrency((row.q2Budget || 0) / 1_000_000)}</td>
-                        <td className="p-4 text-right tabular-nums">{formatCurrency((row.q3Budget || 0) / 1_000_000)}</td>
-                        <td className="p-4 text-right tabular-nums">{formatCurrency((row.q4Budget || 0) / 1_000_000)}</td>
-                        <td className={`p-4 pr-6 text-right tabular-nums ${isTotal ? "text-emerald-700 border-double border-b-4 border-slate-300" : ""}`}>
-                          {formatCurrency(dynamicTotal / 1_000_000)}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {model.lineRows.map((row) => (
+                    <tr key={row.label} className="hover:bg-slate-50/40 transition-colors">
+                      <td className="px-3 py-3 font-medium text-slate-900">
+                        {row.label}
+                      </td>
+                      <td className="px-3 py-3 text-right tabular-nums">
+                        {formatAedMillions(row.actualM)}
+                      </td>
+                      <td className="px-3 py-3 text-right tabular-nums">
+                        {formatAedMillions(row.budgetM)}
+                      </td>
+                      <td className={`px-3 py-3 text-right tabular-nums font-medium ${getToneClass(row.varianceM)}`}>
+                        {formatSignedAedMillions(row.varianceM)}
+                      </td>
+                      <td className={`px-3 py-3 text-right tabular-nums font-medium ${getToneClass(row.varianceM)}`}>
+                        {formatPercent(row.variancePct)}
+                      </td>
+                    </tr>
+                  ))}
+                  {/* Bottom Line Summary Aggregation Row Marker */}
+                  <tr className="bg-slate-50/80 font-bold border-t border-slate-300 text-slate-950">
+                    <td className="px-3 py-4 text-base">Net Profit Before Tax</td>
+                    <td className="px-3 py-4 text-right tabular-nums">{formatAedMillions(model.pbtActualM)}</td>
+                    <td className="px-3 py-4 text-right tabular-nums">{formatAedMillions(model.pbtBudgetM)}</td>
+                    <td className={`px-3 py-4 text-right tabular-nums ${getToneClass(model.pbtVarianceM)}`}>
+                      {formatSignedAedMillions(model.pbtVarianceM)}
+                    </td>
+                    <td className={`px-3 py-4 text-right tabular-nums ${getToneClass(model.pbtVarianceM)}`}>
+                      {formatPercent(model.pbtBudgetM !== 0 ? (model.pbtActualM - model.pbtBudgetM) / Math.abs(model.pbtBudgetM) * 100 : 0)}
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
-          )}
-        </div>
+          </article>
+
+          {/* Scope-Aware Management Attention Highlights Panel */}
+          <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 className="text-lg font-semibold text-slate-950">
+              Management Focus
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">Automated commentary tracks parsed from live vertical parameters.</p>
+            <ul className="mt-5 space-y-4 text-sm text-slate-700">
+              {model.focusItems.map((item) => (
+                <li key={item} className="leading-relaxed text-slate-600 flex items-start gap-2">
+                  <span className="text-indigo-600 font-bold select-none">•</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </article>
+        </section>
       </div>
     </DashboardShell>
   );
