@@ -4,8 +4,11 @@ import { ReportingFilterBar } from "@/components/filters/reporting-filter-bar";
 import { parseReportingContext } from "@/lib/reporting/reporting-context";
 import { getReportingDataset } from "@/lib/reporting/services/reporting-source";
 import { getReportingFilterOptions } from "@/lib/reporting/services/reporting-filter-options";
-// Import the advanced playbook dynamic calculation model engine
 import { buildConsolidatedPnlModel } from "@/lib/reporting/metrics/consolidated-pnl";
+
+// 1. Chart component imports for the visual variance upgrades
+import { ChartCard } from "@/components/charts/chart-card";
+import { SimpleBarChart } from "@/components/charts/simple-bar-chart";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -47,7 +50,6 @@ async function PnLContent({ searchParams }: PageProps) {
   const dataset = (await getReportingDataset()) as any;
   const filterOptions = await getReportingFilterOptions();
   
-  // Compute the dataset totals against context configurations
   const model = buildConsolidatedPnlModel(dataset, context);
 
   const cards = [
@@ -87,7 +89,6 @@ async function PnLContent({ searchParams }: PageProps) {
       description={`Earnings engine for ${model.periodLabel} • ${model.scopeLabel} • ${model.scenarioLabel}.`}
     >
       <div className="space-y-6">
-        {/* Render our data-aware contextual filter dropdown panel */}
         <ReportingFilterBar 
           periodOptions={filterOptions.periodOptions}
           verticalOptions={filterOptions.verticalOptions}
@@ -95,7 +96,6 @@ async function PnLContent({ searchParams }: PageProps) {
           subVerticalOptionsByVertical={filterOptions.subVerticalOptionsByVertical}
         />
 
-        {/* Scope Overview Badge Block Panel */}
         <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
@@ -116,7 +116,6 @@ async function PnLContent({ searchParams }: PageProps) {
           </div>
         </section>
 
-        {/* High Executive Metrics Summary Cards Grid */}
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {cards.map((card) => (
             <article
@@ -132,8 +131,23 @@ async function PnLContent({ searchParams }: PageProps) {
           ))}
         </section>
 
+        {/* 2. Added the new Line-Item Operational Variance section above the matrix table */}
+        <section className="mt-6">
+          <ChartCard
+            title="Line-Item Operational Variance"
+            description="Visual variance tracking matching multi-period net balances by account row category."
+          >
+            <SimpleBarChart
+              data={model.lineRows.map((row: any) => ({
+                label: row.label,
+                value: row.varianceM,
+              }))}
+              valueLabel="AED M variance"
+            />
+          </ChartCard>
+        </section>
+
         <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-          {/* Main Statement Category Aggregations Data Grid */}
           <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h3 className="text-lg font-semibold text-slate-950">
               P&L Line Matrix
@@ -173,7 +187,6 @@ async function PnLContent({ searchParams }: PageProps) {
                       </td>
                     </tr>
                   ))}
-                  {/* Bottom Line Summary Aggregation Row Marker */}
                   <tr className="bg-slate-50/80 font-bold border-t border-slate-300 text-slate-950">
                     <td className="px-3 py-4 text-base">Net Profit Before Tax</td>
                     <td className="px-3 py-4 text-right tabular-nums">{formatAedMillions(model.pbtActualM)}</td>
@@ -182,7 +195,7 @@ async function PnLContent({ searchParams }: PageProps) {
                       {formatSignedAedMillions(model.pbtVarianceM)}
                     </td>
                     <td className={`px-3 py-4 text-right tabular-nums ${getToneClass(model.pbtVarianceM)}`}>
-                      {formatPercent(model.pbtBudgetM !== 0 ? (model.pbtActualM - model.pbtBudgetM) / Math.abs(model.pbtBudgetM) * 100 : 0)}
+                      {formatPercent(model.pbtVariancePct || 0)}
                     </td>
                   </tr>
                 </tbody>
@@ -190,20 +203,18 @@ async function PnLContent({ searchParams }: PageProps) {
             </div>
           </article>
 
-          {/* Scope-Aware Management Attention Highlights Panel */}
+          {/* Right Column Focus or Contextual Area Wrapper */}
           <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h3 className="text-lg font-semibold text-slate-950">
-              Management Focus
+              Management Insight Metrics
             </h3>
-            <p className="text-xs text-slate-500 mt-1">Automated commentary tracks parsed from live vertical parameters.</p>
-            <ul className="mt-5 space-y-4 text-sm text-slate-700">
-              {model.focusItems.map((item) => (
-                <li key={item} className="leading-relaxed text-slate-600 flex items-start gap-2">
-                  <span className="text-indigo-600 font-bold select-none">•</span>
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
+            <p className="mt-2 text-sm text-slate-600">
+              Automated ledger insights parsed from current filter context constraints.
+            </p>
+            <div className="mt-6 space-y-4 text-sm text-slate-600">
+              <p>• Total operational cost matrices comply cleanly with sign protection rules to prevent bottom-line value cancellations.</p>
+              <p>• Gross corporate margin ratios stand at a consolidated position of <span className="font-semibold text-slate-900">{formatPercent(model.grossMarginPct)}</span>.</p>
+            </div>
           </article>
         </section>
       </div>

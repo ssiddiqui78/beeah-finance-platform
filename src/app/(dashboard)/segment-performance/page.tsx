@@ -5,6 +5,10 @@ import { getReportingDataset } from "@/lib/reporting/services/reporting-source";
 import { getReportingFilterOptions } from "@/lib/reporting/services/reporting-filter-options";
 import { ReportingFilterBar } from "@/components/filters/reporting-filter-bar";
 
+// 1. Chart component imports for the visual segment upgrades
+import { ChartCard } from "@/components/charts/chart-card";
+import { SimpleBarChart } from "@/components/charts/simple-bar-chart";
+
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 function formatAedMillions(value: number): string {
@@ -113,6 +117,22 @@ export default async function SegmentPerformancePage({
               <p className={`mt-2 text-sm font-medium ${card.tone}`}>{card.change}</p>
             </article>
           ))}
+        </section>
+
+        {/* 2. Added the new Segment Contribution Overview section above the matrix table */}
+        <section className="mt-6">
+          <ChartCard
+            title="Segment Contribution Overview"
+            description="PBT contribution by the current grouping level."
+          >
+            <SimpleBarChart
+              data={model.matrixRows.map((row) => ({
+                label: row.label,
+                value: row.pbtActualM,
+              }))}
+              valueLabel="AED M PBT"
+            />
+          </ChartCard>
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">

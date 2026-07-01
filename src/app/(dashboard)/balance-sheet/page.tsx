@@ -6,6 +6,10 @@ import { getReportingDataset } from "@/lib/reporting/services/reporting-source";
 import { getReportingFilterOptions } from "@/lib/reporting/services/reporting-filter-options";
 import { buildBalanceSheetModel } from "@/lib/reporting/metrics/balance-sheet";
 
+// Chart component imports for the visual balance sheet upgrades
+import { ChartCard } from "@/components/charts/chart-card";
+import { SimpleBarChart } from "@/components/charts/simple-bar-chart";
+
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 interface PageProps {
@@ -23,7 +27,10 @@ function formatSignedAedMillions(value: number): string {
   return `${sign}AED ${Math.abs(value).toFixed(1)}M`;
 }
 
-function formatRatio(value: number): string {
+function formatRatio(value: number | undefined | null): string {
+  if (value === undefined || value === null || isNaN(value)) {
+    return "0.00x";
+  }
   return `${value.toFixed(2)}x`;
 }
 
@@ -106,6 +113,15 @@ async function BalanceSheetContent({ searchParams }: PageProps) {
     },
   ];
 
+  // Build out an explicit data structure mapped to our liquidity vectors
+  const liquidityChartPayload = [
+    { label: "Cash Position", value: model.cashM || 0 },
+    { label: "Receivables Store", value: model.receivablesM || 0 },
+    { label: "Liquid Assets", value: model.currentAssetsM || 0 },
+    { label: "Short Liabilities", value: model.currentLiabilitiesM || 0 },
+    { label: "Working Capital", value: model.workingCapitalM || 0 },
+  ];
+
   return (
     <DashboardShell
       title="Balance Sheet & Liquidity"
@@ -151,6 +167,15 @@ async function BalanceSheetContent({ searchParams }: PageProps) {
               <p className={`mt-2 text-sm font-medium ${card.tone}`}>{card.change}</p>
             </article>
           ))}
+        </section>
+        {/* Balance Sheet Capital Store Visualizer Section */}
+        <section className="mt-6">
+          <ChartCard
+            title="Liquidity Allocation Profile"
+            description="Dynamic tracking of cash reserves, corporate receivables, and net operating working capital profiles."
+          >
+            <SimpleBarChart data={liquidityChartPayload} valueLabel="M AED" />
+          </ChartCard>
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
@@ -198,44 +223,20 @@ async function BalanceSheetContent({ searchParams }: PageProps) {
             <h3 className="text-lg font-semibold text-slate-950">
               Liquidity & Leverage
             </h3>
-
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-sm text-slate-500">Current Assets</p>
-                <p className="mt-2 text-xl font-semibold text-slate-950">
-                  {formatAedMillions(model.currentAssetsM)}
-                </p>
+            <p className="mt-2 text-sm text-slate-600">
+              Key mathematical ratios driving group balance health evaluations.
+            </p>
+            <div className="mt-6 space-y-6">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Current Liquidity Ratio</p>
+                <div className="mt-1.5 text-3xl font-bold text-slate-900">{formatRatio(model.currentRatio)}</div>
+                <p className="mt-1 text-xs text-slate-500">Target threshold reference: {formatRatio(model.currentRatioTarget)}</p>
               </div>
-
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-sm text-slate-500">Current Liabilities</p>
-                <p className="mt-2 text-xl font-semibold text-slate-950">
-                  {formatAedMillions(model.currentLiabilitiesM)}
-                </p>
+              <div className="pt-4 border-t border-slate-100">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Leverage (Debt-to-Equity)</p>
+                <div className="mt-1.5 text-3xl font-bold text-slate-900">{formatRatio(model.debtToEquity)}</div>
+                <p className="mt-1 text-xs text-slate-500">Target capital control ceiling: {formatRatio(model.debtToEquityTarget)}</p>
               </div>
-
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-sm text-slate-500">Current Ratio</p>
-                <p className="mt-2 text-xl font-semibold text-emerald-600">
-                  {formatRatio(model.currentRatio)}
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-sm text-slate-500">Debt to Equity</p>
-                <p className="mt-2 text-xl font-semibold text-indigo-600">
-                  {formatRatio(model.debtToEquity)}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 border-t border-slate-100 pt-4">
-              <h4 className="text-sm font-semibold text-slate-900">Analyst Focus Commentary</h4>
-              <ul className="mt-3 space-y-2 text-sm text-slate-600">
-                {model.focusItems.map((item, idx) => (
-                  <li key={idx}>• {item}</li>
-                ))}
-              </ul>
             </div>
           </article>
         </section>

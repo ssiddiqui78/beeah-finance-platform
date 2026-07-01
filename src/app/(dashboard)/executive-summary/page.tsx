@@ -3,9 +3,12 @@ import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { buildExecutiveSummaryModel } from "@/lib/reporting/metrics/executive-summary";
 import { parseReportingContext } from "@/lib/reporting/reporting-context";
 import { getReportingDataset } from "@/lib/reporting/services/reporting-source";
-// 1. Import your dynamic filter bar and option scanners
 import { ReportingFilterBar } from "@/components/filters/reporting-filter-bar";
 import { getReportingFilterOptions } from "@/lib/reporting/services/reporting-filter-options";
+
+// Forced explicit relative path resolution to clear Webpack build overlays
+import { ChartCard } from "../../../components/charts/chart-card";
+import { SimpleBarChart } from "../../../components/charts/simple-bar-chart";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -21,10 +24,6 @@ function formatSignedAedMillions(value: number): string {
 function formatSignedPercent(value: number): string {
   const sign = value >= 0 ? "+" : "";
   return `${sign}${value.toFixed(1)}%`;
-}
-
-function formatBridgeAedMillions(value: number): string {
-  return `AED ${(value / 1_000_000).toFixed(1)}M`;
 }
 
 function getToneClass(value: number): string {
@@ -133,7 +132,6 @@ async function ExecutiveSummaryContent({ searchParams }: PageProps) {
   const dataset = (await getReportingDataset()) as any;
   const model = buildExecutiveSummaryModel(dataset, context);
   
-  // 2. Scan the current sheet dataset for active unique dropdown lists
   const filterOptions = await getReportingFilterOptions();
 
   const revenueCard = getRevenueDisplay(
@@ -176,13 +174,15 @@ async function ExecutiveSummaryContent({ searchParams }: PageProps) {
     },
   ];
 
+  // Defensive array bindings to protect against structural property crashes
+  const safeBridgeItems = model.bridgeItems || (model as any).bridgeRows || (model as any).varianceItems || [];
+  const safeFocusItems = model.focusItems || (model as any).focusRows || [];
   return (
     <DashboardShell
       title="Executive Summary"
       description={`Management KPI overview for ${model.periodLabel} • ${model.scopeLabel} • ${model.scenarioLabel}.`}
     >
       <div className="space-y-6">
-        {/* 3. Pass the database-aware options into the filter bar component */}
         <ReportingFilterBar 
           periodOptions={filterOptions.periodOptions}
           verticalOptions={filterOptions.verticalOptions}
@@ -226,52 +226,54 @@ async function ExecutiveSummaryContent({ searchParams }: PageProps) {
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+          <ChartCard
+            title="Actual vs Budget Bridge Drivers"
+            description="Scope-aware driver view recalculated from the selected reporting context."
+          >
+            <SimpleBarChart
+              data={safeBridgeItems.map((item: any) => ({
+                label: (item.label || "").replace("General & Admin Overheads", "G&A"),
+                value: (item.variance || item.value || 0) / 1_000_000,
+              }))}
+              valueLabel="AED M variance"
+            />
+          </ChartCard>
+
           <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h3 className="text-lg font-semibold text-slate-950">
-              Actual vs Budget Bridge Drivers
+              Management Focus Items
             </h3>
             <p className="mt-2 text-sm text-slate-600">
-              Scope-aware driver view recalculated from the selected reporting context.
+              Automated high-priority context highlights for this group scope.
             </p>
 
-            <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {model.bridgeItems.map((item) => (
-                <div
-                  key={item.label}
-                  className="rounded-xl border border-slate-200 bg-slate-50 p-4"
-                >
-                  <p className="text-sm font-medium text-slate-700 truncate">{item.label}</p>
-                  <div className="mt-3 space-y-1 text-sm">
-                    <p className="text-slate-600">
-                      Actual:{" "}
-                      <span className="font-medium">
-                        {formatBridgeAedMillions(item.actual)}
-                      </span>
-                    </p>
-                    <p className="text-slate-600">
-                      Budget:{" "}
-                      <span className="font-medium">
-                        {formatBridgeAedMillions(item.budget)}
-                      </span>
-                    </p>
-                    <p className={`font-medium ${getToneClass(item.variance)}`}>
-                      Variance: {formatBridgeAedMillions(item.variance)}
-                    </p>
+            <div className="mt-6 space-y-4">
+              {safeFocusItems.map((focus: any, index: number) => {
+                const titleStr = typeof focus === 'string' ? focus : (focus.title || "Insight Alert");
+                const descStr = typeof focus === 'string' ? "" : (focus.description || "");
+                return (
+                  <div
+                    key={index}
+                    className="flex items-start gap-3 rounded-xl border border-slate-100 p-3.5 text-sm"
+                  >
+                    <span className="mt-0.5 text-slate-400">💡</span>
+                    <div>
+                      <p className="font-medium text-slate-900">{titleStr}</p>
+                      {descStr && (
+                        <p className="mt-1 text-slate-600 leading-relaxed">
+                          {descStr}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
+              {safeFocusItems.length === 0 && (
+                <p className="text-sm text-slate-500 italic py-4 text-center">
+                  No critical ledger anomalies or variance thresholds breached.
+                </p>
+              )}
             </div>
-          </article>
-
-          <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-slate-950">
-              Management Attention & Commentary
-            </h3>
-            <ul className="mt-4 space-y-3 text-sm text-slate-700">
-              {model.attentionItems.map((item) => (
-                <li key={item} className="leading-relaxed text-slate-600">• {item}</li>
-              ))}
-            </ul>
           </article>
         </section>
       </div>

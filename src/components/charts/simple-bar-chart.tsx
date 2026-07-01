@@ -1,0 +1,73 @@
+"use client";
+
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+
+type SimpleBarChartDatum = {
+  label: string;
+  value: number;
+};
+
+type SimpleBarChartProps = {
+  data: SimpleBarChartDatum[];
+  valueLabel?: string;
+};
+
+function formatValue(value: number, valueLabel: string) {
+  return `${value.toFixed(1)} ${valueLabel}`;
+}
+
+export function SimpleBarChart({
+  data,
+  valueLabel = "M",
+}: SimpleBarChartProps) {
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart
+        data={data}
+        margin={{ top: 12, right: 12, left: 0, bottom: 24 }}
+      >
+        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+        <XAxis
+          dataKey="label"
+          tick={{ fill: "#64748b", fontSize: 12 }}
+          axisLine={{ stroke: "#cbd5e1" }}
+          tickLine={{ stroke: "#cbd5e1" }}
+          angle={-18}
+          textAnchor="end"
+          height={60}
+          interval={0}
+        />
+        <YAxis
+          tick={{ fill: "#64748b", fontSize: 12 }}
+          axisLine={{ stroke: "#cbd5e1" }}
+          tickLine={{ stroke: "#cbd5e1" }}
+        />
+        <Tooltip
+          formatter={(value: number) => formatValue(value, valueLabel)}
+          contentStyle={{
+            borderRadius: "12px",
+            border: "1px solid #e2e8f0",
+            backgroundColor: "#ffffff",
+          }}
+        />
+        <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+          {data.map((entry) => (
+            <Cell
+              key={entry.label}
+              fill={entry.value >= 0 ? "#0f766e" : "#dc2626"}
+            />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
