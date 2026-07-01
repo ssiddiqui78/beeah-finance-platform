@@ -8,6 +8,7 @@ type DashboardShellProps = {
   children: ReactNode;
   title: string;
   description: string;
+  showFilters?: boolean; // Added optional flag support
 };
 
 function formatImportTime(value: string | null): string | null {
@@ -23,6 +24,7 @@ export async function DashboardShell({
   children,
   title,
   description,
+  showFilters = true, // Added with default value true
 }: DashboardShellProps) {
   const reportingStatus = await getReportingStatus();
   const importTimeLabel = formatImportTime(reportingStatus.lastImportedAt);
