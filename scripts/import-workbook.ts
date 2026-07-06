@@ -1,4 +1,22 @@
-﻿import { importWorkbookToLocalSnapshot } from "../src/lib/reporting/services/import-workbook";
+﻿// 1. Force synchronous inline ingestion of env variables first before loading any modules
+const path = require("node:path");
+const fs = require("node:fs");
+
+const envLocalPath = path.join(process.cwd(), ".env.local");
+if (fs.existsSync(envLocalPath)) {
+  const envConfig = fs.readFileSync(envLocalPath, "utf8");
+  envConfig.split(/\r?\n/).forEach((line: string) => {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith("#") && trimmed.includes("=")) {
+      const [key, ...valueParts] = trimmed.split("=");
+      const value = valueParts.join("=").replace(/^["']|["']$/g, ""); // Clean quotes
+      process.env[key.trim()] = value.trim();
+    }
+  });
+}
+
+// 2. Dynamically require the import function at execution runtime to bypass static hoisting blocks
+const { importWorkbookToLocalSnapshot } = require("../src/lib/reporting/services/import-workbook");
 
 async function run() {
   try {
@@ -19,7 +37,7 @@ async function run() {
     console.log("--------------------------------------");
     console.log("Sample rows:");
     console.table(
-      result.dataset.reportingRows.slice(0, 5).map((row) => ({
+      result.dataset.reportingRows.slice(0, 5).map((row: any) => ({
         coName: row.coName,
         glName: row.glName,
         eyMapping1: row.eyMapping1,
