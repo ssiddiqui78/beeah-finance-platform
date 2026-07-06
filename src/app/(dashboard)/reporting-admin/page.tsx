@@ -8,26 +8,25 @@ import { getReportingStatus } from "@/lib/reporting/services/reporting-status";
 export const dynamic = "force-dynamic";
 
 export default async function ReportingAdminPage() {
-  // Fetch telemetry markers directly from the underlying ledger source layer
   const status = await getReportingStatus();
 
   return (
     <DashboardShell
       title="Reporting Admin"
-      description="Operational controls for workbook import, snapshot refresh, and reporting source visibility."
-      showFilters={false} // Disable global reporting selection tools for this admin screen
+      description="Owner/admin control center for workbook upload, snapshot refresh, and reporting source operations."
+      showFilters={false}
     >
       <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
-          Reporting operations
+          Owner operations
         </p>
         <h3 className="mt-2 text-xl font-semibold text-slate-950">
-          Import and refresh control center
+          Upload, import, and snapshot control
         </h3>
         <p className="mt-2 text-sm text-slate-600">
-          This page manages the local reporting snapshot used by the dashboards.
-          Later, the same workflow can be redirected to Supabase persistence and
-          eventually SAP-driven sync jobs.
+          This page is intended for owner/admin reporting operations. Later,
+          when authentication is enabled, access to this screen should be
+          restricted by the formal role hierarchy.
         </p>
       </section>
 
@@ -35,7 +34,6 @@ export default async function ReportingAdminPage() {
         initialStatus={status}
         workbookPath={
           serverEnv.REPORTING_WORKBOOK_PATH ??
-          (status as any).workbookPath ??
           "./data/input/beeah-monthly-report.xlsx"
         }
       />
