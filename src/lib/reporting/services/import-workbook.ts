@@ -34,10 +34,10 @@ export async function importWorkbookToLocalSnapshot(
     throw new Error(`Workbook not found at: ${resolvedPath}`);
   }
 
-  // Read the physical file into a Node Buffer
+  // 1. Read the physical file into a Node Buffer
   const fileBuffer = fs.readFileSync(resolvedPath);
   
-  // Convert Node Buffer to an ArrayBuffer for your workbook parser
+  // 2. Convert Node Buffer to an ArrayBuffer for your workbook parser
   const arrayBuffer = fileBuffer.buffer.slice(
     fileBuffer.byteOffset, 
     fileBuffer.byteOffset + fileBuffer.byteLength
@@ -46,17 +46,27 @@ export async function importWorkbookToLocalSnapshot(
   const periodCode = serverEnv.REPORTING_PERIOD_CODE ?? "2026-03";
   const dataset = await parseBeeahWorkbookFile(arrayBuffer as any, periodCode);
 
-  const repository = resolveReportingRepository();
-  const dbPayload = mapParsedDatasetToDbPayload(dataset);
+  // 3. TRANSITIONAL STEP A: Write down local file snapshot backup data to disk drive cache
+  try {
+    const snapshotService = require("./local-report-snapshot");
+    const writeFn = snapshotService.saveSnapshot || snapshotService.default?.saveSnapshot || snapshotService.writeLocalReportSnapshot;
+    if (typeof writeFn === "function") {
+      await writeFn(dataset);
+    }
+  } catch (snapshotError) {
+    console.warn("[TRANSITIONAL_SNAPSHOT_BACKUP_WARN]:", snapshotError);
+  }
 
-  await repository.saveDataset(dataset);
+  // 4. TRANSITIONAL STEP B: Automatically resolve the active repository and stream live data to Supabase Postgres
+  const repository = resolveReportingRepository();
+  const saveResult = await repository.saveDataset(dataset);
 
   return {
     dataset,
-    snapshotPath: repository.getRepositoryName() === "local_json_snapshot" ? "src/data/local-report-snapshot.json" : null,
+    snapshotPath: "src/data/local-report-snapshot.json",
     workbookPath: resolvedPath,
     repositoryName: repository.getRepositoryName(),
-    preparedReportingRowCount: dbPayload.reportingRows.length,
-    preparedSummaryControlCount: dbPayload.summaryControls.length,
+    preparedReportingRowCount: saveResult.rowCount,
+    preparedSummaryControlCount: saveResult.controlCount,
   };
 }

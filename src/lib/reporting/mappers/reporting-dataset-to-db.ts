@@ -1,25 +1,36 @@
-import type { PersistableReportingDataset } from "../../../types/database";
 import type { ParsedReportDataset } from "../../../types/reporting";
+import type { PersistableReportingDataset } from "../../../types/database";
+
+function parsePeriod(periodCode: string) {
+  const [yearText, monthText] = periodCode.split("-");
+  const year = Number(yearText);
+  const month = Number(monthText);
+
+  const quarter =
+    month <= 3 ? "Q1" :
+    month <= 6 ? "Q2" :
+    month <= 9 ? "Q3" : "Q4";
+
+  return { year, month, quarter };
+}
 
 export function mapParsedDatasetToDbPayload(
-  dataset: ParsedReportDataset
+  dataset: ParsedReportDataset,
 ): PersistableReportingDataset {
-  const [yearText, monthText] = dataset.periodCode.split("-");
-  const fiscalYear = Number(yearText) || 2026;
-  const fiscalMonth =
-    monthText && !Number.isNaN(Number(monthText)) ? Number(monthText) : null;
+  const { year, month, quarter } = parsePeriod(dataset.periodCode);
 
   return {
-    reportPeriod: {
+    period: {
       period_code: dataset.periodCode,
       period_label: dataset.periodLabel,
-      fiscal_year: fiscalYear,
-      fiscal_month: fiscalMonth,
-      quarter_label: fiscalMonth ? deriveQuarterLabel(fiscalMonth) : null,
+      fiscal_year: year,
+      fiscal_month: month,
+      quarter_label: quarter,
       status: "draft",
       source_type: dataset.sourceType,
     },
-    reportingRows: dataset.reportingRows.map((row) => ({
+    rows: dataset.reportingRows.map((row) => ({
+      period_id: "",
       source_type: row.sourceType,
       source_batch_id: null,
       statement_type: row.statementType,
@@ -58,20 +69,14 @@ export function mapParsedDatasetToDbPayload(
       q4_budget: row.q4Budget,
       ytd_budget: row.ytdBudget,
     })),
-    summaryControls: dataset.summaryControls.map((control) => ({
+    controls: dataset.summaryControls.map((control) => ({
+      period_id: "",
       control_section: control.controlSection,
       control_line: control.controlLine,
       budget_value: control.budgetValue,
       actual_value: control.actualValue,
       variance_value: control.varianceValue,
-      variance_pct: control.variancePct,
+      variance_pct: control.variancePct ?? null,
     })),
   };
-}
-
-function deriveQuarterLabel(month: number): string {
-  if (month >= 1 && month <= 3) return "Q1";
-  if (month >= 4 && month <= 6) return "Q2";
-  if (month >= 7 && month <= 9) return "Q3";
-  return "Q4";
 }

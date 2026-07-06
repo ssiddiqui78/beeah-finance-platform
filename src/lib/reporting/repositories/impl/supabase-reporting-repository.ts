@@ -1,86 +1,72 @@
-import { mapParsedDatasetToDbPayload } from "../../mappers/reporting-dataset-to-db";
+import type { ParsedReportDataset } from "../../../../types/reporting";
 import type { ReportingRepository } from "../reporting-repository";
 import { createSupabaseAdminClient } from "../../../supabase/admin";
-import type { ParsedReportDataset } from "../../../../types/reporting";
+import { mapParsedDatasetToDbPayload } from "../../mappers/reporting-dataset-to-db";
 
 export class SupabaseReportingRepository implements ReportingRepository {
+  getRepositoryName() {
+    return "supabase_postgres";
+  }
+
   async getLatestDataset(): Promise<ParsedReportDataset | null> {
     return null;
   }
 
-  async saveDataset(dataset: ParsedReportDataset): Promise<void> {
-    const client = createSupabaseAdminClient();
-
-    if (!client) {
-      throw new Error(
-        "Supabase admin client is not configured. Add SUPABASE_SERVICE_ROLE_KEY and public Supabase URL first."
-      );
-    }
-
+  async saveDataset(dataset: ParsedReportDataset) {
+    const supabase = createSupabaseAdminClient();
     const payload = mapParsedDatasetToDbPayload(dataset);
 
-    const { data: periodRow, error: periodError } = await client
+    const { data: existingPeriod, error: existingPeriodError } = await supabase
       .from("report_periods")
-      .upsert(payload.reportPeriod, { onConflict: "period_code" })
       .select("id")
-      .single();
+      .eq("period_code", payload.period.period_code)
+      .maybeSingle();
 
-    if (periodError || !periodRow) {
-      throw new Error(periodError?.message ?? "Failed to upsert report period.");
+    if (existingPeriodError) throw existingPeriodError;
+
+    let periodId = existingPeriod?.id as string | undefined;
+
+    if (!periodId) {
+      const { data: insertedPeriod, error: insertPeriodError } = await supabase
+        .from("report_periods")
+        .insert(payload.period)
+        .select("id")
+        .single();
+
+      if (insertPeriodError) throw insertPeriodError;
+      periodId = insertedPeriod.id;
     }
 
-    const periodId = periodRow.id as string;
-
-    const { error: deleteRowsError } = await client
+    const { error: deleteRowsError } = await supabase
       .from("reporting_rows")
       .delete()
       .eq("period_id", periodId);
 
-    if (deleteRowsError) {
-      throw new Error(deleteRowsError.message);
-    }
+    if (deleteRowsError) throw deleteRowsError;
 
-    const { error: deleteControlsError } = await client
+    const { error: deleteControlsError } = await supabase
       .from("summary_controls")
       .delete()
       .eq("period_id", periodId);
 
-    if (deleteControlsError) {
-      throw new Error(deleteControlsError.message);
+    if (deleteControlsError) throw deleteControlsError;
+
+    const rows = payload.rows.map((row) => ({ ...row, period_id: periodId! }));
+    const controls = payload.controls.map((item) => ({ ...item, period_id: periodId! }));
+
+    if (rows.length > 0) {
+      const { error: rowsError } = await supabase.from("reporting_rows").insert(rows);
+      if (rowsError) throw rowsError;
     }
 
-    if (payload.reportingRows.length > 0) {
-      const rowsToInsert = payload.reportingRows.map((row) => ({
-        period_id: periodId,
-        ...row,
-      }));
-
-      const { error: rowInsertError } = await client
-        .from("reporting_rows")
-        .insert(rowsToInsert);
-
-      if (rowInsertError) {
-        throw new Error(rowInsertError.message);
-      }
+    if (controls.length > 0) {
+      const { error: controlsError } = await supabase.from("summary_controls").insert(controls);
+      if (controlsError) throw controlsError;
     }
 
-    if (payload.summaryControls.length > 0) {
-      const controlsToInsert = payload.summaryControls.map((control) => ({
-        period_id: periodId,
-        ...control,
-      }));
-
-      const { error: controlInsertError } = await client
-        .from("summary_controls")
-        .insert(controlsToInsert);
-
-      if (controlInsertError) {
-        throw new Error(controlInsertError.message);
-      }
-    }
-  }
-
-  getRepositoryName(): string {
-    return "supabase";
+    return {
+      rowCount: rows.length,
+      controlCount: controls.length,
+    };
   }
 }

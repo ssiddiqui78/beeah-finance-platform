@@ -2,10 +2,15 @@ import type { ParsedReportDataset } from "../../../../types/reporting";
 import type { ReportingRepository } from "../reporting-repository";
 
 export class LocalReportingRepository implements ReportingRepository {
+  getRepositoryName() {
+    return "local_json_snapshot";
+  }
+
   async getLatestDataset(): Promise<ParsedReportDataset | null> {
     try {
+      // Bypass static TS compilation by resolving module dynamically at runtime execution
       const snapshotService = require("../../services/local-report-snapshot");
-      const readFn = snapshotService.getSnapshot || snapshotService.default?.getSnapshot;
+      const readFn = snapshotService.getSnapshot || snapshotService.default?.getSnapshot || snapshotService.readLocalReportSnapshot;
       
       if (typeof readFn === "function") {
         return await readFn();
@@ -17,10 +22,10 @@ export class LocalReportingRepository implements ReportingRepository {
     }
   }
 
-  async saveDataset(dataset: ParsedReportDataset): Promise<void> {
+  async saveDataset(dataset: ParsedReportDataset) {
     try {
       const snapshotService = require("../../services/local-report-snapshot");
-      const writeFn = snapshotService.saveSnapshot || snapshotService.default?.saveSnapshot;
+      const writeFn = snapshotService.saveSnapshot || snapshotService.default?.saveSnapshot || snapshotService.writeLocalReportSnapshot;
       
       if (typeof writeFn === "function") {
         await writeFn(dataset);
@@ -30,9 +35,10 @@ export class LocalReportingRepository implements ReportingRepository {
     } catch (error) {
       console.error("[LOCAL_REPO_SAVE_FAILED]:", error);
     }
-  }
 
-  getRepositoryName(): string {
-    return "local_json_snapshot";
+    return {
+      rowCount: dataset.reportingRows?.length || 0,
+      controlCount: dataset.summaryControls?.length || 0,
+    };
   }
 }
