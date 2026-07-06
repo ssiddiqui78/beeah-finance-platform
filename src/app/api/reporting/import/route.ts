@@ -46,6 +46,7 @@ export async function POST() {
     
     // Execute workbook compilation 
     let result = await importWorkbookToLocalSnapshot(explicitFallbackPath);
+    
     // Check if the parsed workbook layout returned an empty sheet dataset context
     const parsedRowsCount = result?.dataset?.reportingRows?.length || result?.reportingRows?.length || 0;
     const parsedControlsCount = result?.dataset?.summaryControls?.length || result?.summaryControls?.length || 0;
@@ -84,6 +85,12 @@ export async function POST() {
       summaryControlCount: finalControlsCount,
       workbookPath: result?.workbookPath || explicitFallbackPath,
       snapshotPath: result?.snapshotPath || (status as any).snapshotPath,
+      
+      // Step 17 Repository parameters added to network response payload
+      repositoryName: result?.repositoryName || "local_json_snapshot",
+      preparedReportingRowCount: result?.preparedReportingRowCount || finalRowsCount,
+      preparedSummaryControlCount: result?.preparedSummaryControlCount || finalControlsCount,
+      
       status: {
         ...status,
         periodLabel: finalPeriodLabel,

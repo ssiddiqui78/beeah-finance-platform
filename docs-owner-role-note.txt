@@ -1,0 +1,14 @@
+Project owner: Salman
+
+Target initial role assignment after Supabase Auth is connected:
+- Salman => owner
+
+Owner authority includes:
+- full reporting access
+- import and refresh control
+- reporting period management
+- workflow override
+- planning version control
+- user and role administration
+- SAP / integration configuration
+- AI access governance
