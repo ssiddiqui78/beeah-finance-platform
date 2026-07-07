@@ -3,11 +3,15 @@ import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { ImportAdminClient } from "@/components/admin/import-admin-client";
 import { serverEnv } from "@/lib/env.server";
 import { getReportingStatus } from "@/lib/reporting/services/reporting-status";
+import { requireAnyRole } from "@/lib/auth/guards";
 
-// Force absolute dynamic execution to capture live workbook directory adjustments
+// Force absolute dynamic execution to capture live session adjustments
 export const dynamic = "force-dynamic";
 
 export default async function ReportingAdminPage() {
+  // Enforce explicit route security. Non-admin or unauthenticated requests are kicked away instantly.
+  await requireAnyRole(["owner", "admin"]);
+
   const status = await getReportingStatus();
 
   return (
@@ -24,9 +28,8 @@ export default async function ReportingAdminPage() {
           Upload, import, and snapshot control
         </h3>
         <p className="mt-2 text-sm text-slate-600">
-          This page is intended for owner/admin reporting operations. Later,
-          when authentication is enabled, access to this screen should be
-          restricted by the formal role hierarchy.
+          This page is intended for owner/admin reporting operations. Access to this 
+          screen is now actively restricted by your formal corporate role hierarchy.
         </p>
       </section>
 
