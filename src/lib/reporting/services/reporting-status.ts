@@ -2,11 +2,12 @@ import fs from "node:fs";
 import fsPromises from "node:fs/promises";
 import path from "node:path";
 
-import { serverEnv } from "@/lib/env.server";
-import type { SourceType } from "@/types/reporting";
+import { serverEnv } from "../../env.server";
+import { loadReportingDataset } from "../loaders/reporting-loader";
+import type { SourceType } from "../../../types/reporting";
 
 export type ReportingStatus = {
-  mode: "imported_snapshot" | "workbook_fallback" | "sample_fallback";
+  mode: "supabase_primary" | "imported_snapshot" | "workbook_fallback" | "sample_fallback";
   label: string;
   periodLabel: string;
   sourceType: SourceType;
@@ -14,80 +15,60 @@ export type ReportingStatus = {
   summaryControlCount: number | null;
   lastImportedAt: string | null;
   snapshotPath: string | null;
+  workbookPath?: string;
 };
 
 export async function getReportingStatus(): Promise<ReportingStatus> {
-  let snapshot: any = null;
+  // 1. Query the unified data orchestrator loader layer to check the current storage state
+  const { dataset, mode } = await loadReportingDataset();
+
+  const labelMap: Record<string, string> = {
+    supabase_primary: "Supabase primary",
+    imported_snapshot: "Imported snapshot",
+    workbook_fallback: "Workbook fallback",
+    sample_fallback: "Sample fallback",
+  };
+
+  // 2. Resolve the timestamp metadata for file tracking resilience with self-healing checks
+  let lastImportedAt: string | null = null;
   let snapshotPath: string | null = null;
 
-  // Bypasses static bundler warning traces by executing an inline evaluation check
   try {
     const snapshotService = require("./local-report-snapshot");
-    const readSnapshot = snapshotService.readLocalReportSnapshot || snapshotService.default?.readLocalReportSnapshot;
-    const getSnapshotPath = snapshotService.getLocalReportSnapshotPath || snapshotService.default?.getLocalReportSnapshotPath;
+    const pathFn = 
+      snapshotService.getSnapshotPath || 
+      snapshotService.default?.getSnapshotPath || 
+      snapshotService.getLocalReportSnapshotPath ||
+      snapshotService.default?.getLocalReportSnapshotPath;
 
-    if (typeof readSnapshot === "function") {
-      snapshot = await readSnapshot();
-    }
-    if (typeof getSnapshotPath === "function") {
-      snapshotPath = getSnapshotPath();
+    if (typeof pathFn === "function") {
+      snapshotPath = pathFn();
+    } else {
+      // Direct literal calculation backup fallback
+      snapshotPath = path.join(process.cwd(), "src/data/local-report-snapshot.json");
     }
   } catch {
-    snapshot = null;
-    snapshotPath = null;
+    snapshotPath = path.join(process.cwd(), "src/data/local-report-snapshot.json");
   }
 
-  if (snapshot && snapshotPath) {
-    let lastImportedAt: string | null = null;
-
+  if (mode === "imported_snapshot" && snapshotPath && fs.existsSync(snapshotPath)) {
     try {
       const stats = await fsPromises.stat(snapshotPath);
       lastImportedAt = stats.mtime.toISOString();
     } catch {
       lastImportedAt = null;
     }
-
-    return {
-      mode: "imported_snapshot",
-      label: "Imported snapshot",
-      periodLabel: snapshot.periodLabel || "Active Snapshot",
-      sourceType: snapshot.sourceType || "excel",
-      reportingRowCount: snapshot.reportingRows?.length || 0,
-      summaryControlCount: snapshot.summaryControls?.length || 0,
-      lastImportedAt,
-      snapshotPath,
-    };
-  }
-
-  const workbookPath =
-    serverEnv.REPORTING_WORKBOOK_PATH ??
-    path.join(process.cwd(), "data/input/beeah-monthly-report.xlsx");
-
-  const resolvedWorkbookPath = path.isAbsolute(workbookPath)
-    ? workbookPath
-    : path.join(process.cwd(), workbookPath);
-
-  if (fs.existsSync(resolvedWorkbookPath)) {
-    return {
-      mode: "workbook_fallback",
-      label: "Workbook fallback",
-      periodLabel: serverEnv.REPORTING_PERIOD_LABEL || "Excel Mode",
-      sourceType: "excel",
-      reportingRowCount: null,
-      summaryControlCount: null,
-      lastImportedAt: null,
-      snapshotPath: null,
-    };
   }
 
   return {
-    mode: "sample_fallback",
-    label: "Sample fallback",
-    periodLabel: "Sample dataset",
-    sourceType: "manual",
-    reportingRowCount: null,
-    summaryControlCount: null,
-    lastImportedAt: null,
-    snapshotPath: null,
+    mode,
+    label: labelMap[mode] ?? mode,
+    periodLabel: dataset.periodLabel || "Mar 2026 YTD",
+    sourceType: dataset.sourceType || "excel",
+    reportingRowCount: dataset.reportingRows?.length || 0,
+    summaryControlCount: dataset.summaryControls?.length || 0,
+    lastImportedAt,
+    snapshotPath: mode === "imported_snapshot" ? snapshotPath : null,
+    workbookPath: serverEnv.REPORTING_WORKBOOK_PATH ?? "./data/input/beeah-monthly-report.xlsx",
   };
 }

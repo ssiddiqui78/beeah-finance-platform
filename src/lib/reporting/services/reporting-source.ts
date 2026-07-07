@@ -1,100 +1,61 @@
 import fs from "node:fs";
 import path from "node:path";
+import { serverEnv } from "../../env.server";
+import { parseBeeahWorkbookFile } from "../parsers/beeah-workbook-parser";
+import { loadReportingDataset } from "../loaders/reporting-loader";
+import type { ParsedReportDataset } from "../../../types/reporting";
 
-import { serverEnv } from "@/lib/env.server";
-import { beeahSampleDataset } from "@/lib/reporting/mock/beeah-sample";
-import { parseBeeahWorkbookFile } from "@/lib/reporting/parsers/beeah-workbook-parser";
-import type { ParsedReportDataset, ReportingRow, SummaryControl } from "@/types/reporting";
+/**
+ * PRIMARY DATA ARCHITECTURE CORE: 
+ * Route dashboard queries to the primary unified reporting loader engine.
+ */
+export async function getReportingDataset(): Promise<ParsedReportDataset> {
+  try {
+    const result = await loadReportingDataset();
+    if (result && result.dataset && result.dataset.reportingRows && result.dataset.reportingRows.length > 0) {
+      return result.dataset;
+    }
+  } catch (loaderError) {
+    console.warn("[REPORTING_SOURCE_LOADER_CRASH]: Loader layer bypassed, trying direct cache resolvers.", loaderError);
+  }
 
-type ReportingSourceOptions = {
-  workbookPath?: string;
-};
-
-function checkIsBalanceSheetRow(row: any): boolean {
-  const glName = String(row.glName || "").trim().toLowerCase();
-  const mapping = String(row.eyMapping1 || "").trim().toLowerCase();
-  
-  return (
-    mapping.includes("asset") ||
-    mapping.includes("equity") ||
-    mapping.includes("liabilit") ||
-    mapping.includes("capital") ||
-    mapping.includes("receivable") ||
-    mapping.includes("payable") ||
-    mapping.includes("cash") ||
-    mapping.includes("bank") ||
-    mapping.includes("property") ||
-    mapping.includes("inventor") ||
-    glName.includes("asset") ||
-    glName.includes("equity") ||
-    glName.includes("liabilit")
-  );
-}
-
-export async function getReportingDataset(
-  options: ReportingSourceOptions = {}
-): Promise<ParsedReportDataset> {
-  let dataset: ParsedReportDataset | null = null;
-
-  // Uses inline require execution to prevent compilation static analyzer warnings completely
+  // Self-healing fallback: Resolve cache using the exact same multi-name syntax from reporting-status
   try {
     const snapshotService = require("./local-report-snapshot");
-    const readSnapshotFn = snapshotService.readLocalReportSnapshot || snapshotService.default?.readLocalReportSnapshot;
+    const readFn = 
+      snapshotService.readLocalReportSnapshot || 
+      snapshotService.default?.readLocalReportSnapshot ||
+      snapshotService.getSnapshot ||
+      snapshotService.default?.getSnapshot;
 
-    if (typeof readSnapshotFn === "function") {
-      dataset = await readSnapshotFn();
+    if (typeof readFn === "function") {
+      const snapshot = await readFn();
+      if (snapshot && snapshot.reportingRows && snapshot.reportingRows.length > 0) {
+        console.log(`[REPORTING_SOURCE]: Restored calculations via self-healing cache function mapping.`);
+        return snapshot;
+      }
     }
-  } catch {
-    dataset = null;
+  } catch (cacheError) {
+    console.warn("[REPORTING_SOURCE_CACHE_FAILED]: Cache unresolved, falling back to workbook parse.", cacheError);
   }
 
-  if (!dataset) {
-    const workbookPath =
-      options.workbookPath ??
-      serverEnv.REPORTING_WORKBOOK_PATH ??
-      path.join(process.cwd(), "data/input/beeah-monthly-report.xlsx");
+  return getRawWorkbookFallbackDataset();
+}
 
-    const resolvedPath = path.isAbsolute(workbookPath)
-      ? workbookPath
-      : path.join(process.cwd(), workbookPath);
+/**
+ * LOW-LEVEL BACKUP ENGINE: Directly parses the physical Excel sheet from your local machine staging directory.
+ */
+export async function getRawWorkbookFallbackDataset(): Promise<ParsedReportDataset> {
+  const configuredPath = serverEnv.REPORTING_WORKBOOK_PATH || "./data/input/beeah-monthly-report.xlsx";
+  const resolvedDestination = path.isAbsolute(configuredPath) ? configuredPath : path.join(process.cwd(), configuredPath);
 
-    if (fs.existsSync(resolvedPath)) {
-      dataset = await parseBeeahWorkbookFile(resolvedPath, {
-        periodCode: serverEnv.REPORTING_PERIOD_CODE,
-        periodLabel: serverEnv.REPORTING_PERIOD_LABEL,
-      });
-    } else {
-      dataset = beeahSampleDataset;
-    }
+  if (!fs.existsSync(resolvedDestination)) {
+    throw new Error(`Master Workbook File Absence: No Excel spreadsheet discovered at path: ${resolvedDestination}`);
   }
 
-  // --- INTERCEPT AND REPAIR DATA INGESTION MATRIX STRINGS ---
-  const repairedRows: ReportingRow[] = (dataset?.reportingRows || []).map((row: any) => {
-    const isBS = checkIsBalanceSheetRow(row);
-    return {
-      ...row,
-      statementType: isBS ? "BS" : (row.statementType || "PL"),
-    };
-  });
-
-  let repairedControls: SummaryControl[] = dataset?.summaryControls || [];
-  if (!repairedControls || repairedControls.length === 0) {
-    repairedControls = [
-      { periodCode: "2026-03", periodLabel: "Mar 2026 YTD", controlSection: "BS", controlLine: "Total assets", budgetValue: 4800000000, actualValue: 4850500000, varianceValue: 50500000, variancePct: 1.05 },
-      { periodCode: "2026-03", periodLabel: "Mar 2026 YTD", controlSection: "BS", controlLine: "Total equity", budgetValue: 3100000000, actualValue: 3120200000, varianceValue: 20200000, variancePct: 0.65 },
-      { periodCode: "2026-03", periodLabel: "Mar 2026 YTD", controlSection: "BS", controlLine: "Total liabilities", budgetValue: 1700000000, actualValue: 1730300000, varianceValue: 30300000, variancePct: 1.78 },
-      { periodCode: "2026-03", periodLabel: "Mar 2026 YTD", controlSection: "BS", controlLine: "Cash and bank balances", budgetValue: 6500000000, actualValue: 642800000, varianceValue: -7200000, variancePct: -1.1 },
-      { periodCode: "2026-03", periodLabel: "Mar 2026 YTD", controlSection: "BS", controlLine: "Trade and other receivables", budgetValue: 800000000, actualValue: 845200000, varianceValue: 45200000, variancePct: 5.65 },
-      { periodCode: "2026-03", periodLabel: "Mar 2026 YTD", controlSection: "BS", controlLine: "Current assets", budgetValue: 1820000000, actualValue: 1850400000, varianceValue: 30400000, variancePct: 1.67 },
-      { periodCode: "2026-03", periodLabel: "Mar 2026 YTD", controlSection: "BS", controlLine: "Current liabilities", budgetValue: 890000000, actualValue: 860200000, varianceValue: -29800000, variancePct: -3.35 }
-    ];
-  }
-
-  return {
-    periodCode: dataset?.periodCode || "2026-03",
-    periodLabel: dataset?.periodLabel || "Mar 2026 YTD",
-    sourceType: dataset?.sourceType || "excel",
-    reportingRows: repairedRows,
-    summaryControls: repairedControls,
-  };
+  const fileBuffer = fs.readFileSync(resolvedDestination);
+  const arrayBuffer = fileBuffer.buffer.slice(fileBuffer.byteOffset, fileBuffer.byteOffset + fileBuffer.byteLength);
+  const periodCode = serverEnv.REPORTING_PERIOD_CODE || "2026-03";
+  
+  return await parseBeeahWorkbookFile(arrayBuffer as any, periodCode);
 }

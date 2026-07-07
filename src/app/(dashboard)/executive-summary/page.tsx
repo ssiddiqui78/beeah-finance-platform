@@ -129,7 +129,19 @@ async function ExecutiveSummaryContent({ searchParams }: PageProps) {
   const resolvedSearchParams = await searchParams;
   const context = parseReportingContext(resolvedSearchParams);
 
-  const dataset = (await getReportingDataset()) as any;
+    const rawDataset = await getReportingDataset();
+  const serializerModule = require("@/lib/reporting/serializers/db-to-reporting");
+  const dataset = serializerModule.mapDbRowsToParsedDataset({
+    period: { 
+      id: "2026-03", 
+      period_code: rawDataset.periodCode || "2026-03", 
+      period_label: rawDataset.periodLabel || "Mar 2026 YTD", 
+      source_type: rawDataset.sourceType || "excel" 
+    },
+    rows: rawDataset.reportingRows || [],
+    controls: rawDataset.summaryControls || []
+  }) as any;
+
   const model = buildExecutiveSummaryModel(dataset, context);
   
   const filterOptions = await getReportingFilterOptions();

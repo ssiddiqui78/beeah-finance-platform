@@ -1,0 +1,86 @@
+import React from "react";
+import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { getReportingDataset } from "@/lib/reporting/services/reporting-source";
+
+export const dynamic = "force-dynamic";
+
+export default async function ConsolidatedPLPage() {
+  // Query all active lines from your resilient database data loader stack
+  const dataset = await getReportingDataset();
+  const rows = dataset?.reportingRows || [];
+
+  // Filter lines belonging strictly to your Income Statement (Profit & Loss) ledger matrix
+  const plRows = rows.filter((r) => r.statementType === "PL");
+
+  // Calculate corporate totals by filtering account strings using your verified terminology lookups
+  const totalRevenue = plRows
+    .filter((r) => r.eyMapping1 === "Revenue" && r.scenario === "actual")
+    .reduce((sum, r) => sum + Math.abs(r.q1Actuals), 0);
+
+  const budgetRevenue = plRows
+    .filter((r) => r.eyMapping1 === "Revenue" && r.scenario === "budget")
+    .reduce((sum, r) => sum + Math.abs(r.q1Budget), 0);
+
+  const directCosts = plRows
+    .filter((r) => r.glName?.toLowerCase().includes("cost of sales") || r.glName?.toLowerCase().includes("direct cost"))
+    .reduce((sum, r) => sum + Math.abs(r.q1Actuals), 0);
+
+  const grossProfit = totalRevenue - directCosts;
+
+  // Format currency indicators to clean executive presentation units (Millions)
+  const formatAED = (val: number) => `AED ${(val / 1_000_000).toFixed(1)}M`;
+
+  return (
+    <DashboardShell
+      title="Consolidated Statement of Profit or Loss"
+      description="Group-wide performance ledger aggregated directly across waste, energy, and corporate verticals."
+    >
+      {/* 📊 Core Performance Cards Stack */}
+      <div className="grid gap-4 md:grid-cols-3 mb-8">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Gross Revenue</p>
+          <h3 className="mt-2 text-2xl font-bold text-slate-900">{formatAED(totalRevenue)}</h3>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Direct Costs Pool</p>
+          <h3 className="mt-2 text-2xl font-bold text-rose-600">({formatAED(directCosts)})</h3>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Gross Profit Margin</p>
+          <h3 className="mt-2 text-2xl font-bold text-emerald-600">{formatAED(grossProfit)}</h3>
+        </div>
+      </div>
+
+      {/* 📋 Structured Ledger Detail Table */}
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div className="border-b border-slate-200 bg-slate-50/70 px-6 py-4">
+          <h4 className="font-semibold text-slate-900">Ledger Financial Statements</h4>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm text-slate-500">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-700 border-b border-slate-200">
+              <tr>
+                <th className="px-6 py-3 font-bold">Line Items</th>
+                <th className="px-6 py-3 font-bold text-right">Q1 Actuals</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 font-medium text-slate-900">
+              <tr>
+                <td className="px-6 py-4">Revenue (Total Consolidated Operational Turnover)</td>
+                <td className="px-6 py-4 text-right text-emerald-600 font-bold">{formatAED(totalRevenue)}</td>
+              </tr>
+              <tr>
+                <td className="px-6 py-4 text-slate-500">├── Operating Overhead (Direct Production Costs)</td>
+                <td className="px-6 py-4 text-right text-rose-600">({formatAED(directCosts)})</td>
+              </tr>
+              <tr className="bg-slate-900 text-white font-bold">
+                <td className="px-6 py-4 rounded-bl-2xl">Gross Margin Subtotal</td>
+                <td className="px-6 py-4 text-right rounded-br-2xl">{formatAED(grossProfit)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </DashboardShell>
+  );
+}
