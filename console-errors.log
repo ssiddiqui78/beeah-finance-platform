@@ -1,0 +1,37 @@
+
+> beeah-finance-platform@0.1.0 dev
+> next dev
+
+   ▲ Next.js 15.1.9
+   - Local:        http://localhost:3000
+   - Network:      http://10.234.0.76:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 3.6s
+ ○ Compiling /reporting-admin ...
+ ✓ Compiled /reporting-admin in 2.4s (704 modules)
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+ GET /reporting-admin 200 in 7160ms
+ ○ Compiling /api/reporting/upload ...
+ ✓ Compiled /api/reporting/upload in 752ms (722 modules)
+💾 Snapshot permanently saved to cache disk storage layer.
+[SUPABASE_WRITER_FATAL_CRASH]: Data streaming terminated. Error: Database batch write failed on row 0: Could not find the 'apr_value' column of 'reporting_rows' in the schema cache
+    at SupabaseReportingWriter.saveDataset (src\lib\reporting\repositories\impl\supabase-reporting-writer.ts:103:28)
+    at async importWorkbookToLocalSnapshot (src\lib\reporting\services\import-workbook.ts:62:21)
+    at async POST (src\app\api\reporting\upload\route.ts:68:25)
+  101 |         const chunk = dbRowsPayload.slice(i, i + chunkSize);
+  102 |         const { error: rowError } = await supabase.from("reporting_rows").insert(chunk);
+> 103 |         if (rowError) throw new Error(`Database batch write failed on row ${i}: ${rowError.message}`);
+      |                            ^
+  104 |       }
+  105 |
+  106 |       if (dbControlsPayload.length > 0) {
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+ POST /api/reporting/upload 200 in 18903ms
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+ GET /reporting-admin 200 in 2215ms
+Terminate batch job (Y/N)? [?25h
+Terminate batch job (Y/N)? 

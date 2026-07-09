@@ -129,22 +129,14 @@ async function ExecutiveSummaryContent({ searchParams }: PageProps) {
   const resolvedSearchParams = await searchParams;
   const context = parseReportingContext(resolvedSearchParams);
 
-    const rawDataset = await getReportingDataset();
-  const serializerModule = require("@/lib/reporting/serializers/db-to-reporting");
-  const dataset = serializerModule.mapDbRowsToParsedDataset({
-    period: { 
-      id: "2026-03", 
-      period_code: rawDataset.periodCode || "2026-03", 
-      period_label: rawDataset.periodLabel || "Mar 2026 YTD", 
-      source_type: rawDataset.sourceType || "excel" 
-    },
-    rows: rawDataset.reportingRows || [],
-    controls: rawDataset.summaryControls || []
-  }) as any;
-
-  const model = buildExecutiveSummaryModel(dataset, context);
+  // 1. Fetch data straight from the primary pipeline data boundary layer 
+  const dataset = await getReportingDataset();
   
+  // 2. Resolve the dynamic filter options context dropdown arrays
   const filterOptions = await getReportingFilterOptions();
+
+  // 3. Process calculations engine parameters straight from the unified object model
+  const model = buildExecutiveSummaryModel(dataset, context);
 
   const revenueCard = getRevenueDisplay(
     context.scenario,
@@ -186,9 +178,9 @@ async function ExecutiveSummaryContent({ searchParams }: PageProps) {
     },
   ];
 
-  // Defensive array bindings to protect against structural property crashes
   const safeBridgeItems = model.bridgeItems || (model as any).bridgeRows || (model as any).varianceItems || [];
   const safeFocusItems = model.focusItems || (model as any).focusRows || [];
+  
   return (
     <DashboardShell
       title="Executive Summary"

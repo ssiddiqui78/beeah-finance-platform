@@ -43,7 +43,7 @@ export async function getReportingDataset(): Promise<ParsedReportDataset> {
 }
 
 /**
- * LOW-LEVEL BACKUP ENGINE: Directly parses the physical Excel sheet from your local machine staging directory.
+ * LOW-LEVEL BACKUP ENGINE: Directly passes the physical Excel sheet string path to the parser.
  */
 export async function getRawWorkbookFallbackDataset(): Promise<ParsedReportDataset> {
   const configuredPath = serverEnv.REPORTING_WORKBOOK_PATH || "./data/input/beeah-monthly-report.xlsx";
@@ -53,9 +53,12 @@ export async function getRawWorkbookFallbackDataset(): Promise<ParsedReportDatas
     throw new Error(`Master Workbook File Absence: No Excel spreadsheet discovered at path: ${resolvedDestination}`);
   }
 
-  const fileBuffer = fs.readFileSync(resolvedDestination);
-  const arrayBuffer = fileBuffer.buffer.slice(fileBuffer.byteOffset, fileBuffer.byteOffset + fileBuffer.byteLength);
   const periodCode = serverEnv.REPORTING_PERIOD_CODE || "2026-03";
   
-  return await parseBeeahWorkbookFile(arrayBuffer as any, periodCode);
+  // Cleaned Call: Pass the file path string directly and wrap the configuration options in an object container.
+  // Removed 'await' since the underlying parser executes synchronously.
+  return parseBeeahWorkbookFile(resolvedDestination, {
+    periodCode: periodCode,
+    periodLabel: "Mar 2026 YTD"
+  });
 }

@@ -1,0 +1,109 @@
+
+> beeah-finance-platform@0.1.0 dev
+> next dev
+
+   ▲ Next.js 15.1.9
+   - Local:        http://localhost:3000
+   - Network:      http://10.234.0.76:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 4.1s
+ ○ Compiling /api/reporting/upload ...
+ ✓ Compiled /api/reporting/upload in 1575ms (421 modules)
+💾 Snapshot permanently saved to cache disk storage layer.
+[SUPABASE_WRITER_FATAL_CRASH]: Data streaming terminated. Error: Database batch write failed on row 0: Could not find the 'co_code' column of 'reporting_rows' in the schema cache
+    at SupabaseReportingWriter.saveDataset (src\lib\reporting\repositories\impl\supabase-reporting-writer.ts:92:28)
+    at async importWorkbookToLocalSnapshot (src\lib\reporting\services\import-workbook.ts:62:21)
+    at async POST (src\app\api\reporting\upload\route.ts:68:25)
+  90 |         const chunk = dbRowsPayload.slice(i, i + chunkSize);
+  91 |         const { error: rowError } = await supabase.from("reporting_rows").insert(chunk);
+> 92 |         if (rowError) throw new Error(`Database batch write failed on row ${i}: ${rowError.message}`);
+     |                            ^
+  93 |       }
+  94 |
+  95 |       if (dbControlsPayload.length > 0) {
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+ POST /api/reporting/upload 200 in 17458ms
+ ○ Compiling /reporting-admin ...
+ ✓ Compiled /reporting-admin in 1336ms (722 modules)
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+ GET /reporting-admin 200 in 6341ms
+💾 Snapshot permanently saved to cache disk storage layer.
+[SUPABASE_WRITER_FATAL_CRASH]: Data streaming terminated. Error: Database batch write failed on row 0: Could not find the 'co_code' column of 'reporting_rows' in the schema cache
+    at SupabaseReportingWriter.saveDataset (src\lib\reporting\repositories\impl\supabase-reporting-writer.ts:92:28)
+    at async importWorkbookToLocalSnapshot (src\lib\reporting\services\import-workbook.ts:62:21)
+    at async POST (src\app\api\reporting\upload\route.ts:68:25)
+  90 |         const chunk = dbRowsPayload.slice(i, i + chunkSize);
+  91 |         const { error: rowError } = await supabase.from("reporting_rows").insert(chunk);
+> 92 |         if (rowError) throw new Error(`Database batch write failed on row ${i}: ${rowError.message}`);
+     |                            ^
+  93 |       }
+  94 |
+  95 |       if (dbControlsPayload.length > 0) {
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+ POST /api/reporting/upload 200 in 15860ms
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+ GET /reporting-admin 200 in 4076ms
+ ○ Compiling /executive-summary ...
+ ✓ Compiled /executive-summary in 2.7s (1712 modules)
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+ GET /executive-summary 200 in 9012ms
+ ○ Compiling /consolidated-pl ...
+ ✓ Compiled /consolidated-pl in 874ms (1718 modules)
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+ GET /consolidated-pl 200 in 6787ms
+ ○ Compiling /balance-sheet ...
+ ✓ Compiled /balance-sheet in 1077ms (1703 modules)
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+ GET /balance-sheet 200 in 7479ms
+ ○ Compiling /segment-performance ...
+ ✓ Compiled /segment-performance in 1028ms (1700 modules)
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+ GET /segment-performance 200 in 7551ms
+ ✓ Compiled /reporting-admin in 496ms (932 modules)
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+ GET /reporting-admin 200 in 5589ms
+ ✓ Compiled /api/reporting/upload in 435ms (950 modules)
+💾 Snapshot permanently saved to cache disk storage layer.
+[SUPABASE_WRITER_FATAL_CRASH]: Data streaming terminated. Error: Database batch write failed on row 0: Could not find the 'co_code' column of 'reporting_rows' in the schema cache
+    at SupabaseReportingWriter.saveDataset (src\lib\reporting\repositories\impl\supabase-reporting-writer.ts:92:28)
+    at async importWorkbookToLocalSnapshot (src\lib\reporting\services\import-workbook.ts:62:21)
+    at async POST (src\app\api\reporting\upload\route.ts:68:25)
+  90 |         const chunk = dbRowsPayload.slice(i, i + chunkSize);
+  91 |         const { error: rowError } = await supabase.from("reporting_rows").insert(chunk);
+> 92 |         if (rowError) throw new Error(`Database batch write failed on row ${i}: ${rowError.message}`);
+     |                            ^
+  93 |       }
+  94 |
+  95 |       if (dbControlsPayload.length > 0) {
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+ POST /api/reporting/upload 200 in 15553ms
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+[LOADER]: Resilient bypass active. Loaded 6644 ledger lines from local snapshot cache.
+ GET /reporting-admin 200 in 5360ms
+Terminate batch job (Y/N)? [?25h
+Terminate batch job (Y/N)? 

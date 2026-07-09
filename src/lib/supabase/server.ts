@@ -1,37 +1,28 @@
-import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
-
-function getSupabasePublicKey() {
-  return (
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    ""
-  );
-}
+import { cookies } from "next/headers";
 
 export async function createSupabaseServerClient() {
-  const cookieStore = cookies();
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-  const key = getSupabasePublicKey();
+  // ⚡ NEXT.JS 15 FIX: Explicitly await the cookies() promise boundary to clear runtime route crashes
+  const cookieStore = await cookies();
 
-  if (!url || !key) {
-    throw new Error("Missing Supabase server environment variables.");
-  }
-
-  return createServerClient(url, key, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll();
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {
+            // Intercept edge server component mutations silently
+          }
+        },
       },
-      setAll(cookiesToSet) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options),
-          );
-        } catch {
-          // Safe no-op in server component contexts that can't set cookies
-        }
-      },
-    },
-  });
+    }
+  );
 }

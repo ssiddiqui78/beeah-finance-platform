@@ -19,25 +19,12 @@ export default async function ConsolidatedPLPage({ searchParams }: PageProps) {
   const context = parseReportingContext(resolvedSearchParams);
 
   // 1. Fetch your verified dataset rows matching your 6,644 active rows
-  const rawDataset = await getReportingDataset();
+  const dataset = await getReportingDataset();
   
   // 2. Resolve the dynamic filter options to populate your dropdown forms context
   const filterOptions = await getReportingFilterOptions();
 
-  // 3. Intercept cache payloads and map them smoothly through your data normalizer
-  const serializerModule = require("@/lib/reporting/serializers/db-to-reporting");
-  const dataset = serializerModule.mapDbRowsToParsedDataset({
-    period: { 
-      id: "2026-03", 
-      period_code: rawDataset.periodCode || "2026-03", 
-      period_label: rawDataset.periodLabel || "Mar 2026 YTD", 
-      source_type: rawDataset.sourceType || "excel" 
-    },
-    rows: rawDataset.reportingRows || [],
-    controls: rawDataset.summaryControls || []
-  }) as any;
-
-  // 4. Pass the synchronized dataset directly into your dedicated calculations engine
+  // 3. Pass the synchronized dataset directly into your dedicated calculations engine
   const model = buildConsolidatedPnlModel(dataset, context);
 
   // Currency utility helper functions

@@ -1,93 +1,44 @@
 import { createSupabaseServerClient } from "../../../supabase/server";
-import { mapDbRowsToParsedDataset } from "../../serializers/db-to-reporting";
 import type { ParsedReportDataset } from "../../../../types/reporting";
 
 export async function readLatestDatasetFromSupabase(): Promise<ParsedReportDataset | null> {
   try {
     const supabase = await createSupabaseServerClient();
 
-    // 1. Direct query lookup matching by active period code string instead of complex column indices
-    const { data: period, error: periodError } = await supabase
-      .from("report_periods")
-      .select("id, period_code, period_label, source_type")
-      .eq("period_code", "2026-03")
-      .maybeSingle();
+    // 1. Query the primary reporting lines table from Supabase
+    const { data: rows, error: rowsError } = await supabase
+      .from("reporting_rows")
+      .select("gl_code, gl_name, statement_type, ey_mapping_1, vertical, sub_vertical, q1_actuals, q2_budget");
 
-    if (periodError || !period) {
-      // Fall back immediately to local snapshot parsing if no exact period code mapping row exists
+    if (rowsError || !rows) {
+      console.error("[SUPABASE_READER_ERR]: Failed to fetch reporting rows.", rowsError);
       return null;
     }
 
-    // 2. Query financial rows and dashboard control indicators in parallel paths
-    const [{ data: rows, error: rowsError }, { data: controls, error: controlsError }] =
-      await Promise.all([
-        supabase
-          .from("reporting_rows")
-          .select(`
-            source_type,
-            statement_type,
-            scenario,
-            version_label,
-            co_code,
-            co_name,
-            gl_code,
-            gl_name,
-            ey_mapping_1,
-            ey_mapping_2,
-            notes,
-            type,
-            pc_code,
-            pc_name,
-            vertical,
-            sub_vertical,
-            geographical,
-            org_level_3,
-            jan_value,
-            feb_value,
-            mar_value,
-            apr_value,
-            may_value,
-            jun_value,
-            jul_value,
-            aug_value,
-            sep_value,
-            oct_value,
-            nov_value,
-            dec_value,
-            q1_actuals,
-            q1_budget,
-            q2_budget,
-            q3_budget,
-            q4_budget,
-            ytd_budget
-          `)
-          .eq("period_id", period.id),
+    // 2. Map snake_case database columns back to camelCase frontend keys
+    const reportingRows = rows.map((r: any) => ({
+      glCode: r.gl_code,
+      glName: r.gl_name,
+      statementType: r.statement_type || "PL",
+      eyMapping1: r.ey_mapping_1,
+      vertical: r.vertical,
+      subVertical: r.sub_vertical,
+      q1Actuals: Number(r.q1_actuals || 0),
+      q1Budget: Number(r.q2_budget || 0), // Maps your database column back to dashboard models
+      scenario: "actual",
+      versionLabel: "base"
+    }));
 
-        supabase
-          .from("summary_controls")
-          .select(`
-            control_section,
-            control_line,
-            budget_value,
-            actual_value,
-            variance_value,
-            variance_pct
-          `)
-          .eq("period_id", period.id),
-      ]);
+    return {
+      periodCode: "2026-03",
+      periodLabel: "Mar 2026 YTD",
+      sourceType: "supabase",
+      reportingRows,
+      summaryControls: []
+    };
 
-    if (rowsError || !rows || rows.length === 0) {
-      return null;
-    }
-
-    // 3. Serialize your Postgres database rows smoothly straight back to application format
-    return mapDbRowsToParsedDataset({
-      period,
-      rows: rows ?? [],
-      controls: controls ?? [],
-    });
   } catch (error) {
-    console.warn("[SUPABASE_READER_EXCEPTION]: Redirecting to secondary local cache files stack.", error);
+    console.error("[SUPABASE_READER_CRASH]:", error);
     return null;
   }
 }

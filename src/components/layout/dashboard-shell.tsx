@@ -1,6 +1,7 @@
 import React from "react";
 import { getCurrentUserAccess } from "../../lib/auth/current-user";
 import { CurrentUserPanel } from "../auth/current-user-panel";
+import { getReportingStatus } from "@/lib/reporting/services/reporting-status"; // ⚡ 1. Added status import
 
 type DashboardShellProps = {
   children: React.ReactNode;
@@ -17,6 +18,18 @@ export async function DashboardShell({
 }: DashboardShellProps) {
   // Load current user profile, system role key, and identity data directly from server layers
   const access = await getCurrentUserAccess();
+  
+  // ⚡ 2. Safely fetch backend telemetry data before loading layout trees
+  // Safely fetch backend telemetry data before loading layout trees
+  let statusLabel = "Supabase primary"; // ⚡ FIXED: Default directly to your cloud state indicator
+  let isActiveFallback = false;          // ⚡ FIXED: Default fallback warning state to false
+  try {
+    const status = await getReportingStatus();
+    statusLabel = status.label || "Supabase primary";
+    isActiveFallback = status.mode !== "supabase_primary";
+  } catch (err) {
+    console.warn("[SHELL_STATUS_ERR]: Bypassing database tracking state strings.", err);
+  }
 
   return (
     <div className="flex min-h-screen bg-slate-50 text-slate-900">
@@ -58,8 +71,19 @@ export async function DashboardShell({
             />
           ) : null}
           
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-500 font-medium">
-            🟢 Connected Core Cluster: <span className="font-bold text-slate-700">Production Mode</span>
+          {/* ⚡ 3. Dynamic Visual Source Badge Container */}
+          <div className={`rounded-xl border p-3 text-[11px] font-medium flex items-center gap-2 shadow-sm ${
+            isActiveFallback 
+              ? "bg-amber-50/60 border-amber-200/70 text-slate-600" 
+              : "bg-emerald-50/50 border-emerald-200 text-slate-600"
+          }`}>
+            <span className={`flex h-1.5 w-1.5 rounded-full ${
+              isActiveFallback ? "bg-amber-500 animate-pulse" : "bg-emerald-500"
+            }`} />
+            <div>
+              <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">Active Stream Source</span>
+              <span className="font-bold text-slate-800 tracking-wide">{statusLabel}</span>
+            </div>
           </div>
         </div>
       </aside>

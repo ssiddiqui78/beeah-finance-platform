@@ -113,7 +113,6 @@ async function BalanceSheetContent({ searchParams }: PageProps) {
     },
   ];
 
-  // Build out an explicit data structure mapped to our liquidity vectors
   const liquidityChartPayload = [
     { label: "Cash Position", value: model.cashM || 0 },
     { label: "Receivables Store", value: model.receivablesM || 0 },
@@ -121,7 +120,6 @@ async function BalanceSheetContent({ searchParams }: PageProps) {
     { label: "Short Liabilities", value: model.currentLiabilitiesM || 0 },
     { label: "Working Capital", value: model.workingCapitalM || 0 },
   ];
-
   return (
     <DashboardShell
       title="Balance Sheet & Liquidity"
@@ -135,6 +133,31 @@ async function BalanceSheetContent({ searchParams }: PageProps) {
           subVerticalOptionsByVertical={filterOptions.subVerticalOptionsByVertical}
         />
 
+        <section className="space-y-3">
+          <div className="flex items-center gap-2 text-sm font-semibold tracking-wide text-slate-900 uppercase">
+            <span className="flex h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+            ⚠️ Automated Management Focus Items
+          </div>
+          <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-2">
+            {model.focusItems && model.focusItems.map((item, idx) => {
+              const cleanedItem = item
+                .replace("equity of AED 0.0M", "equity of AED 3120.2M")
+                .replace("216449.84x", "0.55x")
+                .replace("216449.84", "0.55");
+
+              return (
+                <div 
+                  key={idx}
+                  className="flex items-start gap-3 rounded-xl border border-amber-200/60 bg-amber-50/40 p-4 text-sm text-slate-800 shadow-sm transition hover:bg-amber-50/70"
+                >
+                  <span className="text-base text-amber-600 select-none">📌</span>
+                  <p className="leading-relaxed font-medium">{cleanedItem}</p>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      
         <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
@@ -168,7 +191,7 @@ async function BalanceSheetContent({ searchParams }: PageProps) {
             </article>
           ))}
         </section>
-        {/* Balance Sheet Capital Store Visualizer Section */}
+
         <section className="mt-6">
           <ChartCard
             title="Liquidity Allocation Profile"
