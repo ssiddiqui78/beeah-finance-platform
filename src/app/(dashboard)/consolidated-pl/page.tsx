@@ -1,46 +1,46 @@
-import React from "react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { getReportingDataset } from "@/lib/reporting/services/reporting-source";
 import { parseReportingContext } from "@/lib/reporting/reporting-context";
 import { buildConsolidatedPnlModel } from "@/lib/reporting/metrics/consolidated-pnl";
-import { ReportingFilterBar } from "@/components/filters/reporting-filter-bar";
 import { getReportingFilterOptions } from "@/lib/reporting/services/reporting-filter-options";
+import { ReportingFilterBar } from "@/components/filters/reporting-filter-bar";
 
-export const dynamic = "force-dynamic";
-
-type SearchParams = Promise<Record<string, string | string[] | undefined>>;
-
-interface PageProps {
-  searchParams: SearchParams;
+function formatAedMillions(value: number) {
+  const sign = value < 0 ? "-" : "";
+  return `${sign}AED ${(Math.abs(value) / 1_000_000).toFixed(1)}M`;
 }
 
-export default async function ConsolidatedPLPage({ searchParams }: PageProps) {
-  const resolvedSearchParams = await searchParams;
+function formatPct(value: number | null) {
+  if (value === null || Number.isNaN(value)) return "—";
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value.toFixed(1)}%`;
+}
+
+function varianceTone(value: number, label: string) {
+  const isExpense = label.includes("Cost") || label.includes("G&A") || label.includes("Marketing") || label.includes("Impairment");
+  if (value > 0) return isExpense ? "text-rose-600 font-semibold" : "text-emerald-600 font-semibold";
+  if (value < 0) return isExpense ? "text-emerald-600 font-semibold" : "text-rose-600 font-semibold";
+  return "text-slate-500";
+}
+
+export default async function ConsolidatedPnlPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const resolvedSearchParams = searchParams ? await searchParams : {};
   const context = parseReportingContext(resolvedSearchParams);
-
-  // 1. Fetch your verified dataset rows matching your 6,644 active rows
-  const dataset = await getReportingDataset();
   
-  // 2. Resolve the dynamic filter options to populate your dropdown forms context
+  const dataset = await getReportingDataset();
   const filterOptions = await getReportingFilterOptions();
-
-  // 3. Pass the synchronized dataset directly into your dedicated calculations engine
   const model = buildConsolidatedPnlModel(dataset, context);
-
-  // Currency utility helper functions
-  const formatM = (val: number) => `AED ${Math.abs(val).toFixed(1)}M`;
-  const formatTableM = (val: number) => {
-    const text = `AED ${Math.abs(val).toFixed(1)}M`;
-    return val < 0 ? `(${text})` : text;
-  };
 
   return (
     <DashboardShell
       title="Consolidated P&L"
-      description={`Management performance summary for ${model.periodLabel} • ${model.scopeLabel} • ${model.scenarioLabel}.`}
+      description={`Management income statement view for ${model.scopeLabel}.`}
     >
       <div className="space-y-6">
-        {/* 🎛️ SECTION 1: Standard Production Context Filter Control Dropdowns Header */}
         <ReportingFilterBar 
           periodOptions={filterOptions.periodOptions}
           verticalOptions={filterOptions.verticalOptions}
@@ -48,101 +48,132 @@ export default async function ConsolidatedPLPage({ searchParams }: PageProps) {
           subVerticalOptionsByVertical={filterOptions.subVerticalOptionsByVertical}
         />
 
-        {/* 📋 SECTION 2: Scope Context Active Tracking Badge */}
-        <section className="mb-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
-                Active reporting scope
-              </p>
-              <h3 className="mt-2 text-xl font-semibold text-slate-950">
-                {model.scopeLabel}
-              </h3>
-              <p className="mt-1 text-sm text-slate-600">
-                Scenario view layout: <span className="text-slate-900 font-semibold">{model.scenarioLabel}</span>
-              </p>
-            </div>
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Revenue
+            </p>
+            <p className="mt-3 text-2xl font-semibold text-slate-900 tracking-tight">
+              {formatAedMillions(model.revenue)}
+            </p>
+          </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
-              {model.filteredRowCount.toLocaleString()} filtered reporting lines mapped
-            </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Gross Profit
+            </p>
+            <p className="mt-3 text-2xl font-semibold text-slate-900 tracking-tight">
+              {formatAedMillions(model.grossProfit)}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Gross Margin
+            </p>
+            <p className="mt-3 text-2xl font-semibold text-slate-900 tracking-tight">
+              {formatPct(model.grossMarginPct)}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Operating Profit
+            </p>
+            <p className="mt-3 text-2xl font-semibold text-slate-900 tracking-tight">
+              {formatAedMillions(model.operatingProfit)}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              PBT
+            </p>
+            <p className="mt-3 text-2xl font-semibold text-slate-900 tracking-tight">
+              {formatAedMillions(model.pbt)}
+            </p>
           </div>
         </section>
 
-        {/* 📊 SECTION 3: Performance KPI Summary Scorecards Cards */}
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">Gross Revenue</p>
-            <h3 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{formatM(model.revenueActualM)}</h3>
-            <p className="mt-2 text-sm font-medium text-emerald-600">▲ +AED 4.5M vs budget</p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">Direct Costs</p>
-            <h3 className="mt-3 text-3xl font-semibold tracking-tight text-rose-600">
-              ({formatM(model.revenueActualM - model.grossProfitActualM)})
-            </h3>
-            <p className="mt-2 text-sm font-medium text-rose-600">▼ -AED 2.2M variance overages</p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">Gross Profit Margin</p>
-            <h3 className="mt-3 text-3xl font-semibold tracking-tight text-emerald-600">{formatM(model.grossProfitActualM)}</h3>
-            <p className="mt-2 text-sm font-medium text-emerald-600">🟢 Margin variance performance met ({model.grossMarginPct.toFixed(1)}%)</p>
-          </div>
-        </div>
+        <section className="grid gap-6 xl:grid-cols-[1.5fr_0.9fr]">
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-2">
+            <div className="px-5 py-4">
+              <h2 className="text-base font-semibold text-slate-900">
+                Consolidated Line Matrix
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Actual vs budget performance breakdown aggregated from your 6,644 reporting rows.
+              </p>
+            </div>
 
-        {/* 📋 SECTION 4: Structured Group Trial Balance Financial Spreadsheet Table */}
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <div className="border-b border-slate-200 bg-slate-50/70 px-6 py-4 flex items-center justify-between">
-            <h4 className="font-semibold text-slate-900">Financial Ledger Statements</h4>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-500">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-700 border-b border-slate-200">
-                <tr>
-                  <th className="px-6 py-3 font-bold">Financial Statement Line Items</th>
-                  <th className="px-6 py-3 font-bold text-right">Q1 Actuals</th>
-                  <th className="px-6 py-3 font-bold text-right">Q1 Budget</th>
-                  <th className="px-6 py-3 font-bold text-right">Variance</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-medium text-slate-900">
-                {model.lineRows.map((line) => {
-                  const isRevenue = line.label === "Revenue";
-                  const isExpense = line.label.includes("Cost") || line.label.includes("Overheads") || line.label.includes("expenses");
-                  
-                  let actualColor = "text-slate-900";
-                  if (isRevenue) actualColor = "text-emerald-600 font-bold";
-                  else if (isExpense) actualColor = "text-slate-700";
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-slate-50/70 text-left text-slate-500 border-b border-slate-100">
+                  <tr>
+                    <th className="px-5 py-3 font-semibold">Line Item Category</th>
+                    <th className="px-5 py-3 font-semibold">Actual</th>
+                    <th className="px-5 py-3 font-semibold">Budget</th>
+                    <th className="px-5 py-3 font-semibold">Variance</th>
+                    <th className="px-5 py-3 font-semibold">Variance %</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100/70">
+                  {/* ⚡ FIXED: Swapped out loop target to look at model.lines directly */}
+                  {(model.lines || []).map((line) => {
+                    const isPercentLine = line.label.includes("%");
+                    const isSubTotalLine = line.label === "Gross Profit" || line.label === "Operating Profit" || line.label === "PBT";
 
-                  return (
-                    <tr key={line.label} className="hover:bg-slate-50/50 transition">
-                      <td className="px-6 py-4 font-semibold text-slate-800">
-                        {isExpense ? `├── ${line.label}` : line.label}
-                      </td>
-                      <td className={`px-6 py-4 text-right ${actualColor}`}>
-                        {isExpense && line.actualM > 0 ? `(${formatM(line.actualM)})` : formatTableM(line.actualM)}
-                      </td>
-                      <td className="px-6 py-4 text-right text-slate-400">
-                        {isExpense && line.budgetM > 0 ? `(${formatM(line.budgetM)})` : formatTableM(line.budgetM)}
-                      </td>
-                      <td className={`px-6 py-4 text-right font-bold ${line.varianceM >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-                        {line.varianceM >= 0 ? "+" : ""}{(line.varianceM).toFixed(1)}M
-                      </td>
-                    </tr>
-                  );
-                })}
-                
-                {/* Total Group Profit Before Tax Subtotal Summary Row */}
-                <tr className="bg-slate-900 text-white font-bold text-base border-t-2 border-slate-900">
-                  <td className="px-6 py-4 rounded-bl-2xl">Net Profit Before Tax (PBT)</td>
-                  <td className="px-6 py-4 text-right text-emerald-400">{formatM(model.pbtActualM)}</td>
-                  <td className="px-6 py-4 text-right text-slate-400">{formatM(model.pbtBudgetM)}</td>
-                  <td className="px-6 py-4 text-right text-emerald-400">+{model.pbtVarianceM.toFixed(1)}M</td>
-                </tr>
-              </tbody>
-            </table>
+                    return (
+                      <tr 
+                        key={line.key} 
+                        className={`transition hover:bg-slate-50/40 ${isSubTotalLine ? "bg-slate-50/50 font-medium" : ""}`}
+                      >
+                        <td className={`px-5 py-3 text-slate-900 ${isSubTotalLine ? "font-semibold" : ""}`}>
+                          {line.label}
+                        </td>
+                        <td className="px-5 py-3 text-slate-700">
+                          {isPercentLine ? `${line.actual.toFixed(1)}%` : formatAedMillions(line.actual)}
+                        </td>
+                        <td className="px-5 py-3 text-slate-700">
+                          {isPercentLine ? `${line.budget.toFixed(1)}%` : formatAedMillions(line.budget)}
+                        </td>
+                        <td className={`px-5 py-3 ${varianceTone(line.variance, line.label)}`}>
+                          {isPercentLine ? `${line.variance.toFixed(1)}%` : formatAedMillions(line.variance)}
+                        </td>
+                        <td className="px-5 py-3 text-slate-600 font-medium">
+                          {formatPct(line.variancePct)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6">
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">
+                Management Focus Alerts
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Automated driver insight tags computed directly from active account categories.
+              </p>
+            </div>
+
+            <div className="mt-6 space-y-3">
+              {model.focusItems.map((item, index) => (
+                <div
+                  key={index}
+                  className="rounded-xl border border-slate-100 bg-slate-50/60 px-4 py-3.5 text-sm text-slate-700 leading-relaxed flex items-start gap-2.5 shadow-sm"
+                >
+                  <span className="text-slate-400 mt-0.5">💡</span>
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
       </div>
     </DashboardShell>
   );
