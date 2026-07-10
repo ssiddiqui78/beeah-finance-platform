@@ -11,6 +11,14 @@ export type ConsolidatedPnlLine = {
   variancePct: number | null;
 };
 
+export type DrilldownRow = {
+  label: string;
+  actual: number;
+  budget: number;
+  variance: number;
+  variancePct: number | null;
+};
+
 export type ConsolidatedPnlViewModel = {
   scopeLabel: string;
   filteredRowCount: number;
@@ -22,6 +30,11 @@ export type ConsolidatedPnlViewModel = {
   pbtMarginPct: number | null;
   lines: ConsolidatedPnlLine[];
   focusItems: string[];
+  
+  // ⚡ Step 24 Drilldown Context Extensions
+  selectedLine: string | null;
+  mapping2Rows: DrilldownRow[];
+  glRows: DrilldownRow[];
 };
 
 const LINE_ORDER = [
@@ -113,6 +126,7 @@ function buildLine(
 export function buildConsolidatedPnlModel(
   dataset: ParsedReportDataset,
   context: ReportingContext,
+  selectedLine: string | null = null // ⚡ Added third dynamic drill argument parameter
 ): ConsolidatedPnlViewModel {
   const filteredRows = filterRowsByContext(dataset.reportingRows || [], context);
 
@@ -137,7 +151,6 @@ export function buildConsolidatedPnlModel(
 
   let financeActual = sumDisplayValue(filteredRows, ["finance cost", "interest", "finance costs"], "q1Actuals");
   let financeBudget = sumDisplayValue(filteredRows, ["finance cost", "interest", "finance costs"], "q1Budget");
-
   // 🛡️ RECOVERY SAFEGUARDS: Keep metrics from falling to absolute zero state metrics loops
   if (Math.abs(revenueActual) < 1000) {
     revenueActual = 94500000; revenueBudget = 90000000;
@@ -197,6 +210,71 @@ export function buildConsolidatedPnlModel(
   const topDriver = rankedVarianceLines[0];
   const secondDriver = rankedVarianceLines[1];
 
+  // ⚡ DYNAMIC FORENSIC DRILLDOWN EXTRACTION ENGINE
+  const mapping2Rows: DrilldownRow[] = [];
+  const glRows: DrilldownRow[] = [];
+
+  if (selectedLine) {
+    let kw: string[] = [selectedLine.toLowerCase()];
+    if (selectedLine === "Direct Cost") kw = ["direct cost", "cost of sales", "direct costs"];
+    if (selectedLine === "G&A") kw = ["general & admin", "overheads", "g&a", "administrative"];
+    if (selectedLine === "Marketing") kw = ["marketing", "selling", "sales expenses"];
+    if (selectedLine === "Finance Costs") kw = ["finance cost", "interest", "finance costs"];
+    if (selectedLine === "Other Income") kw = ["other income", "non-operating income"];
+
+    const subRows = filteredRows.filter((row) => {
+      const matchText = normalizeText(row.eyMapping1 || row.glName);
+      return kw.some(k => matchText.includes(k));
+    });
+
+    // A. AGGREGATE BY EY MAPPING 2 COMPOSITION DIMENSIONS
+    const m2Map = new Map<string, { act: number; bud: number }>();
+    subRows.forEach((row) => {
+      const lbl = (row.eyMapping2 || "Unclassified Composition").trim();
+      const curr = m2Map.get(lbl) || { act: 0, bud: 0 };
+      const actVal = displayPnlValue(row.q1Actuals || 0);
+      const budVal = displayPnlValue((row as any).q2_budget || row.q1Budget || 0);
+      m2Map.set(lbl, { act: curr.act + actVal, bud: curr.bud + budVal });
+    });
+
+    m2Map.forEach((v, k) => {
+      const vVariance = v.act - v.bud;
+      mapping2Rows.push({
+        label: k,
+        actual: v.act,
+        budget: v.bud,
+        variance: vVariance,
+        variancePct: safePct(vVariance, Math.abs(v.bud))
+      });
+    });
+
+    // B. AGGREGATE BY GRANULAR GENERAL LEDGER LINES DETAIL
+    const glMap = new Map<string, { act: number; bud: number }>();
+    subRows.forEach((row) => {
+      const codeStr = row.glCode ? `[${row.glCode}] ` : "";
+      const lbl = `${codeStr}${row.glName || "Unknown GL Account"}`;
+      const curr = glMap.get(lbl) || { act: 0, bud: 0 };
+      const actVal = displayPnlValue(row.q1Actuals || 0);
+      const budVal = displayPnlValue((row as any).q2_budget || row.q1Budget || 0);
+      glMap.set(lbl, { act: curr.act + actVal, bud: curr.bud + budVal });
+    });
+
+    glMap.forEach((v, k) => {
+      const vVariance = v.act - v.bud;
+      glRows.push({
+        label: k,
+        actual: v.act,
+        budget: v.bud,
+        variance: vVariance,
+        variancePct: safePct(vVariance, Math.abs(v.bud))
+      });
+    });
+
+    // Sort drilldown elements by largest absolute variance to bubble up problem items first
+    mapping2Rows.sort((a, b) => Math.abs(b.variance) - Math.abs(a.variance));
+    glRows.sort((a, b) => Math.abs(b.variance) - Math.abs(a.variance));
+  }
+
   const focusItems = [
     `Scope: ${buildScopeLabel(context)} with ${(filteredRows.length || 6644).toLocaleString()} P&L rows included.`,
     `Revenue variance vs budget is ${revenueVariance >= 0 ? "favorable" : "unfavorable"} at AED ${(Math.abs(revenueVariance) / 1_000_000).toFixed(1)}M.`,
@@ -227,5 +305,8 @@ export function buildConsolidatedPnlModel(
     pbtMarginPct: safePct(pbtActual, revenueActual),
     lines: sortedLines,
     focusItems,
+    selectedLine,
+    mapping2Rows,
+    glRows
   };
 }
